@@ -520,6 +520,9 @@ function makePanelFx(canvas, panelEl) {
     if (shardPool.length < 50) shardPool.push(s);
   }
 
+  let canvasWidth = 0;
+  let canvasHeight = 0;
+
   function resize() {
     const r = panelEl.getBoundingClientRect();
     const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -528,6 +531,8 @@ function makePanelFx(canvas, panelEl) {
     canvas.style.width = (r.width + 80) + "px";
     canvas.style.height = (r.height + 80) + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    canvasWidth = r.width + 80;
+    canvasHeight = r.height + 80;
   }
 
   const ro = new ResizeObserver(resize);
@@ -537,17 +542,19 @@ function makePanelFx(canvas, panelEl) {
   function extravagantBurst(x, y, strength=1) {
     const n = Math.floor(30 + 50 * strength);
     const parts = fx.burst?.parts || [];
+    
     for (let i=0;i<n;i++){
-      const angle = (Math.random() * Math.PI * 2);
-      const spread = 0.3 + Math.random() * 0.4;
-      const speed = (0.5 + Math.random() * 1.5) * strength;
+      // Explode in all directions like a firework
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (2 + Math.random() * 4) * strength;
+      
       parts.push({
-        x: x + Math.cos(angle) * spread,
-        y: y + Math.sin(angle) * spread,
-        vx: (Math.random() - 0.5) * 0.8,
-        vy: 0.3 + Math.random() * 1.2,
+        x: x,
+        y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
         life: 1,
-        size: 0.5 + Math.random() * 0.8,
+        size: 3 + Math.random() * 4,
         hue: 120 + (Math.random() * 30),
         settled: false
       });
@@ -772,12 +779,43 @@ function makePanelFx(canvas, panelEl) {
       if (fx.rainbow.t > 0.65) fx.rainbow = null;
     }
 
-    // Hourglass sand particles
+    // Firework particles that fall to bottom
     if (fx.burst) {
       const parts = fx.burst.parts;
       ctx.save();
       ctx.globalCompositeOperation = "screen";
-      const bottomY = h - 20; // Bottom of iframe with small margin
+      // Get panel dimensions (iframe boundaries) - exact frame dimensions
+      const panelRect = panelEl.getBoundingClientRect();
+      const panelW = panelRect.width;
+      const panelH = panelRect.height;
+      const canvasOffset = 40; // Canvas has 40px inset
+      const borderRadius = 22; // Match panel border-radius
+      // Use exact frame bottom - no margin
+      const bottomY = panelH + canvasOffset; // Exact bottom of iframe
+      const leftBound = canvasOffset;
+      const rightBound = panelW + canvasOffset;
+      
+      // Helper function to check if particle is within rounded corner bounds
+      function isWithinRoundedBounds(x, y) {
+        const relX = x - canvasOffset;
+        const relY = y - canvasOffset;
+        const cornerRadius = borderRadius;
+        
+        // Check bottom-left corner
+        if (relX < cornerRadius && relY > panelH - cornerRadius) {
+          const dx = relX - cornerRadius;
+          const dy = relY - (panelH - cornerRadius);
+          return (dx * dx + dy * dy) <= (cornerRadius * cornerRadius);
+        }
+        // Check bottom-right corner
+        if (relX > panelW - cornerRadius && relY > panelH - cornerRadius) {
+          const dx = relX - (panelW - cornerRadius);
+          const dy = relY - (panelH - cornerRadius);
+          return (dx * dx + dy * dy) <= (cornerRadius * cornerRadius);
+        }
+        // Within rectangular bounds
+        return relX >= 0 && relX <= panelW && relY >= 0 && relY <= panelH;
+      }
       
       for (const pt of parts) {
         if (pt.settled) {
@@ -789,7 +827,7 @@ function makePanelFx(canvas, panelEl) {
           continue;
         }
         
-        // Apply gravity
+        // Apply gravity (always pulling down)
         pt.vy += 0.15; // Gravity acceleration
         pt.vx *= 0.98; // Horizontal friction
         
@@ -797,21 +835,140 @@ function makePanelFx(canvas, panelEl) {
         pt.x += pt.vx;
         pt.y += pt.vy;
         
-        // Check if hit bottom
-        if (pt.y >= bottomY - pt.size) {
-          pt.y = bottomY - pt.size;
-          pt.vy = 0;
-          pt.vx = 0;
-          pt.settled = true;
+        // Helper function to check if point is inside rounded rectangle (accounting for particle size)
+        function isInsideRoundedRect(x, y, size) {
+          const relX = x - canvasOffset;
+          const relY = y - canvasOffset;
+          const r = borderRadius;
+          const margin = size + 1.5; // Increased margin to keep particles further inside
+          
+          // Check if outside basic rectangle bounds (with margin)
+          if (relX < margin || relX > panelW - margin || relY < margin || relY > panelH - margin) {
+            return false;
+          }
+          
+          // Check bottom-left corner
+          if (relX < r && relY > panelH - r) {
+            const cornerX = r;
+            const cornerY = panelH - r;
+            const dx = relX - cornerX;
+            const dy = relY - cornerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            return dist <= (r - margin);
+          }
+          
+          // Check bottom-right corner
+          if (relX > panelW - r && relY > panelH - r) {
+            const cornerX = panelW - r;
+            const cornerY = panelH - r;
+            const dx = relX - cornerX;
+            const dy = relY - cornerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            return dist <= (r - margin);
+          }
+          
+          // Check top-left corner
+          if (relX < r && relY < r) {
+            const cornerX = r;
+            const cornerY = r;
+            const dx = relX - cornerX;
+            const dy = relY - cornerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            return dist <= (r - margin);
+          }
+          
+          // Check top-right corner
+          if (relX > panelW - r && relY < r) {
+            const cornerX = panelW - r;
+            const cornerY = r;
+            const dx = relX - cornerX;
+            const dy = relY - cornerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            return dist <= (r - margin);
+          }
+          
+          // Inside rectangular area (not in corners)
+          return true;
         }
         
-        // Keep particles within horizontal bounds
-        if (pt.x < pt.size) {
-          pt.x = pt.size;
-          pt.vx *= -0.3; // Bounce with damping
-        } else if (pt.x > w - pt.size) {
-          pt.x = w - pt.size;
-          pt.vx *= -0.3;
+        // Constrain particle to stay inside rounded rectangle
+        const relX = pt.x - canvasOffset;
+        const relY = pt.y - canvasOffset;
+        const r = borderRadius;
+        const margin = pt.size + 1.5; // Increased margin to keep particles further inside
+        
+        // Check if particle is outside bounds and push it back in
+        if (!isInsideRoundedRect(pt.x, pt.y, pt.size)) {
+          // Push particle back inside
+          if (relX < margin) {
+            pt.x = canvasOffset + margin;
+            pt.vx *= -0.5;
+          } else if (relX > panelW - margin) {
+            pt.x = canvasOffset + panelW - margin;
+            pt.vx *= -0.5;
+          }
+          
+          if (relY < margin) {
+            pt.y = canvasOffset + margin;
+            pt.vy *= -0.5;
+          } else if (relY > panelH - margin) {
+            // Handle bottom edge and corners
+            const isInLeftCorner = relX < r;
+            const isInRightCorner = relX > panelW - r;
+            
+            if (isInLeftCorner) {
+              // Bottom-left corner - constrain to curve
+              const cornerX = canvasOffset + r;
+              const cornerY = canvasOffset + panelH - r;
+              const dx = pt.x - cornerX;
+              const dy = pt.y - cornerY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              const maxDist = r - margin;
+              if (dist > maxDist) {
+                const angle = Math.atan2(dy, dx);
+                pt.x = cornerX + Math.cos(angle) * maxDist;
+                pt.y = cornerY + Math.sin(angle) * maxDist;
+                pt.vx *= 0.3;
+                pt.vy *= 0.3;
+              }
+            } else if (isInRightCorner) {
+              // Bottom-right corner - constrain to curve
+              const cornerX = canvasOffset + panelW - r;
+              const cornerY = canvasOffset + panelH - r;
+              const dx = pt.x - cornerX;
+              const dy = pt.y - cornerY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              const maxDist = r - margin;
+              if (dist > maxDist) {
+                const angle = Math.atan2(dy, dx);
+                pt.x = cornerX + Math.cos(angle) * maxDist;
+                pt.y = cornerY + Math.sin(angle) * maxDist;
+                pt.vx *= 0.3;
+                pt.vy *= 0.3;
+              }
+            } else {
+              // Flat bottom edge
+              pt.y = canvasOffset + panelH - margin;
+            }
+          }
+        }
+        
+        // Check if hit bottom (only settle on flat bottom, not in corners)
+        if (pt.y >= bottomY - pt.size) {
+          const isInLeftCorner = relX < r;
+          const isInRightCorner = relX > panelW - r;
+          
+          // Only settle if on flat bottom edge (not in corners)
+          if (!isInLeftCorner && !isInRightCorner) {
+            pt.y = bottomY - pt.size;
+            pt.vy = 0;
+            pt.vx = 0;
+            pt.settled = true;
+          } else {
+            // In corner - keep it moving/sliding
+            pt.vy *= 0.95;
+            pt.vx *= 0.95;
+          }
         }
         
         // Draw particle
