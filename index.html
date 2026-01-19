@@ -76,7 +76,9 @@
       --knobPress: 1.40; /* expand 40% on press */
       --rowGap: clamp(14px, 2.2vw, 18px);
       --labelGap: 10px;
-      --hitH: clamp(56px, 9.5vw, 74px);
+      /* Maximize hitbox: extend into gap between sliders, leaving ~1px buffer to prevent overlap */
+      /* Gap is rowGap * 1.2, so each slider can extend by ~(gap/2 - 1px) */
+      --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(7.4px, 1.32vw, 9.8px));
       --btnH: clamp(44px, 6vw, 54px);
       --btnW: clamp(120px, 18vw, 170px);
 
@@ -132,6 +134,7 @@
       background: rgba(255,255,255,0.18);
       position: relative;
       overflow: visible;
+      pointer-events: none; /* Allow clicks to pass through to trackWrap */
     }
 
     .trackGlow {
