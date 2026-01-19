@@ -8,10 +8,14 @@
   <title>Quad808 — Quad Interactive Mix Fader</title>
 
   <style>
-    @import url("https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap");
-  </style>
+    @font-face {
+      font-family: "VCR OSD Mono";
+      src: url("assets/fonts/VCR_OSD_MONO_1.001.ttf") format("truetype");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
 
-  <style>
     html, body {
       height: 100%;
       margin: 0;
@@ -22,7 +26,7 @@
 
     body {
       -webkit-text-size-adjust: 100%;
-      font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: "VCR OSD Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
@@ -63,33 +67,6 @@
       z-index: 3;              /* above labels so nothing clips it */
     }
 
-    /* Reward flash wave overlay */
-    .rewardWave {
-      position: absolute;
-      inset: -10px;
-      pointer-events: none;
-      z-index: 4;
-      opacity: 0;
-      mix-blend-mode: screen;
-    }
-    .rewardWave.run {
-      animation: waveFlash 520ms ease-out forwards;
-    }
-    @keyframes waveFlash {
-      0%   { opacity: 0; transform: translateX(18%); }
-      10%  { opacity: 1; }
-      100% { opacity: 0; transform: translateX(-22%); }
-    }
-    .rewardWave::before{
-      content:"";
-      position:absolute;
-      inset:-20px;
-      background:
-        radial-gradient(120px 120px at 88% 35%, rgba(255,255,255,0.95), rgba(255,255,255,0) 60%),
-        radial-gradient(180px 180px at 86% 62%, rgba(255,255,255,0.85), rgba(255,255,255,0) 70%),
-        linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 100%);
-      filter: blur(2px);
-    }
 
     :root{
       --text: clamp(16px, 2.2vw, 22px);
@@ -291,10 +268,10 @@
 </head>
 
 <body>
+  <div class="rewardWave" id="rewardWave"></div>
   <div class="stage">
     <div class="panel" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
-      <div class="rewardWave" id="rewardWave"></div>
 
       <div class="coupon" id="coupon">
         <div class="title">Easter Egg Unlocked</div>
@@ -433,11 +410,21 @@ async function ensureStarted() {
   buildGraph();
   audio.started = true;
   audio.playing = true;
+  updatePlayButton();
 }
 
 async function play() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:412',message:'play() entry',data:{ctxState:audio.ctx?.state,started:audio.started,playing:audio.playing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
   await ensureStarted();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:414',message:'before resume in play()',data:{ctxState:audio.ctx?.state},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
   await audio.ctx.resume();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:415',message:'after resume in play()',data:{ctxState:audio.ctx?.state},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
   audio.playing = true;
   updatePlayButton();
 }
@@ -451,6 +438,20 @@ async function pause() {
 
 function updatePlayButton() {
   const btn = document.getElementById("btnPlay");
+  if (!btn) return;
+  
+  // Sync playing state with context state, but only if context exists and audio has started
+  // This ensures button reflects actual state when context is resumed via gestures
+  if (audio.ctx && audio.started) {
+    const contextRunning = audio.ctx.state === 'running';
+    // Only sync if context is running (don't override explicit pause)
+    // This handles the case where gestureStartAudio resumes the context
+    if (contextRunning) {
+      audio.playing = true;
+    }
+    // If context is suspended, trust our internal state (pause() sets it correctly)
+  }
+  
   btn.textContent = audio.playing ? "PAUSE" : "PLAY";
 }
 
@@ -465,7 +466,34 @@ function makePanelFx(canvas, panelEl) {
     burst: null,       // {parts:[]}
     rainbow: null,     // {t, dir, strength, y}
     wave: null,        // {t, x0, y0}
+    completion: null,  // {iris: {t}, shards: {t, parts:[]}, particles: {t, parts:[]}}
   };
+
+  // Reusable particle pools to avoid allocations
+  const particlePool = [];
+  const shardPool = [];
+  
+  function getParticle() {
+    return particlePool.pop() || { x: 0, y: 0, vx: 0, vy: 0, life: 1, size: 0, angle: 0, type: 0 };
+  }
+  
+  function getShard() {
+    return shardPool.pop() || { angle: 0, hue: 0 };
+  }
+  
+  function releaseParticle(p) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:472',message:'releaseParticle',data:{poolSize:particlePool.length,willAdd:particlePool.length<100},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    if (particlePool.length < 100) particlePool.push(p);
+  }
+  
+  function releaseShard(s) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:476',message:'releaseShard',data:{poolSize:shardPool.length,willAdd:shardPool.length<50},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    if (shardPool.length < 50) shardPool.push(s);
+  }
 
   function resize() {
     const r = panelEl.getBoundingClientRect();
@@ -520,10 +548,221 @@ function makePanelFx(canvas, panelEl) {
     fx.rain = { parts };
   }
 
+  function triggerCompletionBurst() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const centerX = w / 2;
+    const centerY = h / 2;
+    
+    // Check prefers-reduced-motion
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    
+    if (prefersReducedMotion) {
+      // Minimal flash only
+      fx.completion = {
+        iris: { t: 0 },
+        shards: null,
+        particles: null
+      };
+      return;
+    }
+    
+    // Layer A: Iris Flash (40-120ms)
+    fx.completion = {
+      iris: { t: 0 },
+      shards: { t: 0, parts: [] },
+      particles: { t: 0, parts: [] }
+    };
+    
+    // Layer B: Prismatic Shard Ring (24 shards for more intensity)
+    const numShards = 24;
+    for (let i = 0; i < numShards; i++) {
+      const shard = getShard();
+      shard.angle = (i / numShards) * Math.PI * 2;
+      // Cyan → Violet → Magenta gradient
+      shard.hue = 180 + (i / numShards) * 180;
+      fx.completion.shards.parts.push(shard);
+    }
+    
+    // Layer C: Particle Drift (80 particles for more intensity)
+    const numParticles = 80;
+    for (let i = 0; i < numParticles; i++) {
+      const p = getParticle();
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.2 + Math.random() * 1.8;
+      p.x = centerX;
+      p.y = centerY;
+      p.vx = Math.cos(angle) * speed;
+      p.vy = Math.sin(angle) * speed;
+      p.life = 1;
+      p.size = 2.0 + Math.random() * 3.5; // Larger particles
+      p.angle = angle;
+      p.type = Math.random() < 0.5 ? 0 : 1; // 0 = square, 1 = line
+      fx.completion.particles.parts.push(p);
+    }
+  }
+
   function draw(dt) {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    ctx.clearRect(0,0,w,h);
+    const centerX = w / 2;
+    const centerY = h / 2;
+    // #region agent log
+    try {
+      ctx.clearRect(0,0,w,h);
+    } catch (err) {
+      fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:586',message:'canvas context error',data:{error:err.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      return;
+    }
+    // #endregion
+
+    // Completion burst effect
+    if (fx.completion) {
+      const comp = fx.completion;
+      
+      // Layer A: Iris Flash (40-120ms)
+      if (comp.iris) {
+        comp.iris.t += dt;
+        const irisDuration = 0.12;
+        if (comp.iris.t < irisDuration) {
+          let opacity = 0;
+          if (comp.iris.t < 0.04) {
+            opacity = comp.iris.t / 0.04;
+          } else {
+            opacity = 1 - ((comp.iris.t - 0.04) / (irisDuration - 0.04));
+          }
+          
+          ctx.save();
+          ctx.globalCompositeOperation = "screen";
+          // Larger, brighter flash
+          const radius = Math.min(w, h) * 0.55 * (1 + comp.iris.t * 3);
+          const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+          grad.addColorStop(0, `rgba(255, 255, 255, ${opacity * 1.0})`);
+          grad.addColorStop(0.3, `rgba(255, 255, 255, ${opacity * 0.9})`);
+          grad.addColorStop(0.6, `rgba(255, 255, 255, ${opacity * 0.7})`);
+          grad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx.fill();
+          // Add glow effect
+          ctx.shadowBlur = 40;
+          ctx.shadowColor = `rgba(255, 255, 255, ${opacity * 0.6})`;
+          ctx.fill();
+          ctx.restore();
+        } else {
+          comp.iris = null;
+        }
+      }
+      
+      // Layer B: Prismatic Shard Ring (120-650ms)
+      if (comp.shards && comp.shards.parts.length > 0) {
+        comp.shards.t += dt;
+        const shardDuration = 0.65;
+        if (comp.shards.t < shardDuration) {
+          const progress = comp.shards.t / shardDuration;
+          const eased = 1 - Math.pow(1 - progress, 3);
+          
+          ctx.save();
+          ctx.globalCompositeOperation = "screen";
+          ctx.lineCap = "round";
+          ctx.lineWidth = 3.5; // Thicker, more visible shards
+          
+          for (const shard of comp.shards.parts) {
+            const dist = eased * Math.min(w, h) * 0.45; // Expand further
+            const rotation = eased * 0.2; // More rotation
+            const angle = shard.angle + rotation;
+            const shardLength = 12 + eased * 4; // Longer shards
+            const x1 = centerX + Math.cos(angle) * (dist - shardLength);
+            const y1 = centerY + Math.sin(angle) * (dist - shardLength);
+            const x2 = centerX + Math.cos(angle) * (dist + shardLength);
+            const y2 = centerY + Math.sin(angle) * (dist + shardLength);
+            
+            const life = 1 - progress;
+            const alpha = life * 1.0; // Brighter
+            const hue = shard.hue + progress * 40; // More color shift
+            // More saturated colors
+            ctx.strokeStyle = `hsla(${hue % 360}, 95%, 70%, ${alpha})`;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = `hsla(${hue % 360}, 95%, 70%, ${alpha * 0.5})`;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+          }
+          
+          ctx.restore();
+        } else {
+          comp.shards.parts.forEach(s => releaseShard(s));
+          comp.shards = null;
+        }
+      }
+      
+      // Layer C: Particle Drift (400-1600ms)
+      if (comp.particles && comp.particles.parts.length > 0) {
+        comp.particles.t += dt;
+        const particleDuration = 1.6;
+        if (comp.particles.t < particleDuration) {
+          ctx.save();
+          ctx.globalCompositeOperation = "screen";
+          
+          for (const p of comp.particles.parts) {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= 0.985; // Slower decay for longer trails
+            p.vy *= 0.985;
+            
+            const elapsed = comp.particles.t;
+            if (elapsed < 0.3) {
+              p.life = elapsed / 0.3; // Faster fade in
+            } else {
+              p.life = 1 - ((elapsed - 0.3) / (particleDuration - 0.3));
+            }
+            
+            if (p.life > 0 && p.x > -30 && p.x < w + 30 && p.y > -30 && p.y < h + 30) {
+              ctx.globalAlpha = p.life * 0.95; // Brighter particles
+              ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
+              
+              if (p.type === 0) {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
+                // Add glow to squares
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
+                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                ctx.restore();
+              } else {
+                ctx.strokeStyle = "rgba(255, 255, 255, 1.0)";
+                ctx.lineWidth = p.size * 0.7; // Thicker lines
+                ctx.lineCap = "round";
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = "rgba(255, 255, 255, 0.6)";
+                ctx.beginPath();
+                ctx.moveTo(p.x - p.vx * 5, p.y - p.vy * 5); // Longer trails
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+              }
+            }
+          }
+          
+          ctx.restore();
+          
+          comp.particles.parts = comp.particles.parts.filter(p => {
+            const alive = p.life > 0 && p.x > -50 && p.x < w + 50 && p.y > -50 && p.y < h + 50;
+            if (!alive) releaseParticle(p);
+            return alive;
+          });
+        } else {
+          comp.particles.parts.forEach(p => releaseParticle(p));
+          comp.particles = null;
+        }
+      }
+      
+      if (!comp.iris && !comp.shards && !comp.particles) {
+        fx.completion = null;
+      }
+    }
 
     // Rainbow sweep line effect (visual-only)
     if (fx.rainbow) {
@@ -614,6 +853,7 @@ function makePanelFx(canvas, panelEl) {
     extravagantBurst,
     startRainbowSweep,
     startRain,
+    triggerCompletionBurst,
   };
 }
 
@@ -625,15 +865,8 @@ const rewardWaveEl = document.getElementById("rewardWave");
 let rewardArmed = true;
 
 function runRewardWave(){
-  if (!rewardArmed) return;
-  rewardArmed = false;
-  rewardWaveEl.classList.remove("run");
-  // reflow
-  void rewardWaveEl.offsetWidth;
-  rewardWaveEl.classList.add("run");
-  setTimeout(() => {
-    rewardArmed = true; // can trigger again if they leave and re-enter
-  }, 900);
+  // Rainbow flash effect removed
+  // Function kept for compatibility but does nothing
 }
 
 /* =========================
@@ -830,11 +1063,32 @@ function makeSlider(opts){
   }
 
   async function gestureStartAudio(){
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1039',message:'gestureStartAudio entry',data:{ctxState:audio.ctx?.state,started:audio.started,playing:audio.playing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     // improves iOS reliability: try resume on any pointerdown
     try {
       await initAudio();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1043',message:'before resume',data:{ctxState:audio.ctx?.state},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       await audio.ctx.resume();
-    } catch {}
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1046',message:'after resume',data:{ctxState:audio.ctx?.state,started:audio.started},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      // If context is running and we have started audio, we're playing
+      if (audio.ctx && audio.ctx.state === 'running' && audio.started) {
+        audio.playing = true;
+        updatePlayButton();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1049',message:'synced playing state',data:{playing:audio.playing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+      }
+    } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1051',message:'gestureStartAudio error',data:{error:err.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+    }
   }
 
   function onDown(e){
@@ -842,6 +1096,9 @@ function makeSlider(opts){
     e.preventDefault();
 
     // iOS audio: attempt resume on gesture
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1057',message:'onDown calling gestureStartAudio (not awaited)',data:{pointerId:e.pointerId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     gestureStartAudio();
 
     isDown = true;
@@ -907,6 +1164,12 @@ function makeSlider(opts){
       target = (v > 1) ? rubber(v) : v;
     } else {
       target = v;
+    }
+    
+    // Update audio mix immediately during dragging for real-time feedback
+    const clampedTarget = Math.max(0, Math.min(1, target));
+    if (opts.onChange) {
+      opts.onChange(clampedTarget);
     }
   }
 
@@ -975,11 +1238,19 @@ function makeSlider(opts){
 
   function animate(){
     // 20% less drag (more responsive): increase follow factor
-    const follow = isDown ? 0.275 : 0.225;
+    const follow = isDown ? 0.316 : 0.259;
+    const prevDisplay = display;
     display = display + (target - display) * follow;
 
     display = Math.max(-OVERPULL_MAX, Math.min(1+OVERPULL_MAX, display));
     setKnobFromDisplay();
+    
+    // Update audio mix during dragging if display changed significantly
+    // This ensures smooth audio crossfading while dragging
+    if (isDown && Math.abs(display - prevDisplay) > 0.001 && opts.onChange) {
+      const clampedDisplay = Math.max(0, Math.min(1, display));
+      opts.onChange(clampedDisplay);
+    }
 
     // speed-based glow: brightness depends on motion speed
     const v = Math.abs(display - lastDisplay) / (16.7 / 1000);
@@ -1006,7 +1277,7 @@ function makeSlider(opts){
   window.addEventListener("pointerup", onUp, { passive: false });
   window.addEventListener("pointercancel", onUp, { passive: false });
 
-  return {
+  const sliderAPI = {
     get value(){ return Math.max(0, Math.min(1, value)); },
     set value(v){
       value = Math.max(0, Math.min(1, v));
@@ -1014,8 +1285,11 @@ function makeSlider(opts){
       display = value;
       setKnobFromDisplay();
       opts.onChange?.(value);
-    }
+    },
+    getDisplayValue: () => Math.max(0, Math.min(1, display))
   };
+  
+  return sliderAPI;
 }
 
 /* =========================
@@ -1043,8 +1317,10 @@ async function onFirstInteract(){
   try {
     await play();
     applyMix();
+    updatePlayButton();
   } catch (err) {
     console.error(err);
+    updatePlayButton();
   }
 }
 
@@ -1058,12 +1334,18 @@ btnPlay.addEventListener("click", async (e) => {
     if (!audio.started) {
       await play();
       applyMix();
+      updatePlayButton();
       return;
     }
-    if (audio.playing) await pause();
-    else await play();
+    if (audio.playing) {
+      await pause();
+    } else {
+      await play();
+    }
+    updatePlayButton();
   } catch (err){
     console.error(err);
+    updatePlayButton();
   }
 }, { passive:false });
 
@@ -1077,11 +1359,18 @@ window.addEventListener("keydown", async (e) => {
     if (!audio.started) {
       await play();
       applyMix();
+      updatePlayButton();
       return;
     }
-    if (audio.playing) await pause();
-    else await play();
-  } catch {}
+    if (audio.playing) {
+      await pause();
+    } else {
+      await play();
+    }
+    updatePlayButton();
+  } catch {
+    updatePlayButton();
+  }
 }, { passive:false });
 
 function bothRight(){
@@ -1094,21 +1383,91 @@ function checkReward(){
   const nowBoth = bothRight();
   if (nowBoth && !lastBothRight) {
     runRewardWave();
-
-    // also give a bright burst at the right side (visual reward)
-    const r = panelEl.getBoundingClientRect();
-    // right-ish, mid-ish
-    panelFx.extravagantBurst(r.width + 40, r.height * 0.55, 1.0);
   }
   lastBothRight = nowBoth;
 }
 
+/* =========================
+   COMPLETION BURST TRACKING
+========================= */
+
+let completionBurstState = {
+  toneMet: false,
+  blendMet: false,
+  toneMetTime: 0,
+  blendMetTime: 0,
+  cooldownUntil: 0
+};
+
+const COMPLETION_THRESHOLD = 0.985;
+const COMPLETION_HOLD_TIME = 120; // ms
+const COMPLETION_COOLDOWN = 2500; // ms
+const COMPLETION_RESET_THRESHOLD = 0.95;
+
+function checkCompletionBurst() {
+  // Only check if sliders exist
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1348',message:'checkCompletionBurst entry',data:{sliderToneExists:!!sliderTone,sliderBlendExists:!!sliderBlend},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  if (!sliderTone || !sliderBlend) return;
+  
+  const now = performance.now();
+  // Use display values for continuous checking during dragging
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1354',message:'calling getDisplayValue',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  const toneDisplay = sliderTone.getDisplayValue();
+  const blendDisplay = sliderBlend.getDisplayValue();
+  const toneMet = toneDisplay >= COMPLETION_THRESHOLD;
+  const blendMet = blendDisplay >= COMPLETION_THRESHOLD;
+  
+  // Track when each slider reaches threshold
+  if (toneMet && !completionBurstState.toneMet) {
+    completionBurstState.toneMet = true;
+    completionBurstState.toneMetTime = now;
+  } else if (!toneMet) {
+    completionBurstState.toneMet = false;
+    completionBurstState.toneMetTime = 0;
+  }
+  
+  if (blendMet && !completionBurstState.blendMet) {
+    completionBurstState.blendMet = true;
+    completionBurstState.blendMetTime = now;
+  } else if (!blendMet) {
+    completionBurstState.blendMet = false;
+    completionBurstState.blendMetTime = 0;
+  }
+  
+  // Check if both have been met for required duration
+  const bothMetForDuration = 
+    completionBurstState.toneMet && 
+    completionBurstState.blendMet &&
+    completionBurstState.toneMetTime > 0 &&
+    completionBurstState.blendMetTime > 0 &&
+    (now - completionBurstState.toneMetTime) >= COMPLETION_HOLD_TIME &&
+    (now - completionBurstState.blendMetTime) >= COMPLETION_HOLD_TIME;
+  
+  // Check cooldown
+  const inCooldown = now < completionBurstState.cooldownUntil;
+  
+  // Reset cooldown if sliders drop below reset threshold
+  if (toneDisplay < COMPLETION_RESET_THRESHOLD || blendDisplay < COMPLETION_RESET_THRESHOLD) {
+    completionBurstState.cooldownUntil = 0;
+  }
+  
+  // Trigger if conditions met and not in cooldown
+  if (bothMetForDuration && !inCooldown) {
+    panelFx.triggerCompletionBurst();
+    completionBurstState.cooldownUntil = now + COMPLETION_COOLDOWN;
+    // Reset tracking to prevent immediate retrigger
+    completionBurstState.toneMetTime = 0;
+    completionBurstState.blendMetTime = 0;
+  }
+}
+
 function slingshotFX({ strength, dir, wrap }){
-  const wr = wrap.getBoundingClientRect();
-  // y position relative to panelFx canvas
-  const pr = panelEl.getBoundingClientRect();
-  const y = (wr.top - pr.top) + (wr.height / 2) + 40; // + inset offset
-  panelFx.startRainbowSweep(y, dir, strength);
+  // Rainbow sweep effect removed
+  // Function kept for compatibility but does nothing
 }
 
 function slingshotLandFX({ strength, dest, wrap }){
@@ -1181,6 +1540,16 @@ const sliderBlend = makeSlider({
 
 tone = sliderTone.value;
 blend = sliderBlend.value;
+
+// Continuous check for completion burst (runs every frame after sliders are created)
+function completionBurstLoop() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1483',message:'completionBurstLoop iteration',data:{sliderToneExists:!!sliderTone,sliderBlendExists:!!sliderBlend},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  checkCompletionBurst();
+  requestAnimationFrame(completionBurstLoop);
+}
+requestAnimationFrame(completionBurstLoop);
 
 document.addEventListener("touchmove", (e) => {
   // prevent page scroll inside embed while interacting
