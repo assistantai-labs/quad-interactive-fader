@@ -206,56 +206,6 @@
       border-color: rgba(255,255,255,0.28);
     }
 
-    /* Easter egg popup */
-    .coupon {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 6;
-      background: rgba(0,0,0,0.72);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 16px;
-      padding: 16px 18px;
-      min-width: min(320px, 86vw);
-      text-align: center;
-      opacity: 0;
-      pointer-events: none;
-      box-shadow: 0 18px 48px rgba(0,0,0,0.55);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    .coupon.show {
-      opacity: 1;
-      pointer-events: auto;
-      animation: popIn 220ms ease-out;
-    }
-    @keyframes popIn {
-      from { transform: translate(-50%, -50%) scale(0.92); opacity: 0; }
-      to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-    .coupon .title {
-      font-size: clamp(16px, 2.4vw, 20px);
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-    }
-    .coupon .code {
-      font-size: clamp(18px, 2.8vw, 24px);
-      letter-spacing: 0.22em;
-      font-weight: 700;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(255,255,255,0.10);
-      display: inline-block;
-      margin-bottom: 10px;
-    }
-    .coupon .sub {
-      font-size: clamp(12px, 1.8vw, 14px);
-      opacity: 0.85;
-      letter-spacing: 0.06em;
-    }
 
     @media (max-width: 520px){
       .panel{
@@ -273,11 +223,6 @@
     <div class="panel" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
 
-      <div class="coupon" id="coupon">
-        <div class="title">Easter Egg Unlocked</div>
-        <div class="code" id="couponCode">QUAD50</div>
-        <div class="sub">50% off your first order</div>
-      </div>
 
       <div class="rows">
         <div class="row" data-slider="tone">
@@ -341,8 +286,8 @@ async function initAudio() {
   if (audio.ctx) return;
   const Ctx = window.AudioContext || window.webkitAudioContext;
   audio.ctx = new Ctx();
-  // iOS: resume must happen on a user gesture; we call resume from pointer handlers too.
-  await audio.ctx.resume();
+  // iOS: Don't resume here - must be called from user gesture handler
+  // Resume will be called from gestureStartAudio() or play button
 }
 
 async function loadBuffers() {
@@ -358,6 +303,8 @@ async function loadBuffers() {
 }
 
 function buildGraph() {
+  // iOS: sources must be started from user gesture, so we start them immediately
+  // when this is called (which should be from ensureStarted after resume)
   const make = (name, bufKey) => {
     const src = audio.ctx.createBufferSource();
     src.buffer = audio.buffers[bufKey];
@@ -374,8 +321,16 @@ function buildGraph() {
   make("rawFull", "rawFull");
   make("quadFull", "quadFull");
 
-  const t0 = audio.ctx.currentTime + 0.02;
-  Object.values(audio.sources).forEach(s => s.start(t0));
+  // Start sources immediately (must be in user gesture context)
+  // Use a small offset to ensure context is running
+  const t0 = Math.max(audio.ctx.currentTime, audio.ctx.currentTime + 0.01);
+  Object.values(audio.sources).forEach(s => {
+    try {
+      s.start(t0);
+    } catch (err) {
+      console.warn("Failed to start audio source:", err);
+    }
+  });
 }
 
 function setMix(tone, blend) {
@@ -406,6 +361,15 @@ function setMix(tone, blend) {
 async function ensureStarted() {
   if (audio.started) return;
   await initAudio();
+  // iOS: Must resume context before starting sources (must be in user gesture)
+  if (audio.ctx.state !== 'running') {
+    try {
+      await audio.ctx.resume();
+    } catch (err) {
+      console.warn("Audio context resume failed:", err);
+      throw err; // Re-throw so caller knows it failed
+    }
+  }
   await loadBuffers();
   buildGraph();
   audio.started = true;
@@ -810,17 +774,6 @@ function runRewardWave(){
    EASTER EGG (bottom knob vertical pull ONLY when both right)
 ========================= */
 
-const couponEl = document.getElementById("coupon");
-const couponCodeEl = document.getElementById("couponCode");
-const COUPON_CODE = "QUAD50";
-
-function showCoupon(){
-  couponCodeEl.textContent = COUPON_CODE;
-  couponEl.classList.add("show");
-  // auto-hide after a bit
-  setTimeout(() => couponEl.classList.remove("show"), 6500);
-}
-
 /* =========================
    SLIDER ENGINE
 ========================= */
@@ -850,6 +803,7 @@ function makeSlider(opts){
   let vPullEnabled = !!opts.verticalEgg;
   let vPulling = false;
   let vStartY = 0;
+  let vStartX = 0;
   let vOffset = 0;
 
   // Overpull clamp: knob always visible, hard stop holdable
@@ -1000,16 +954,28 @@ function makeSlider(opts){
   }
 
   async function gestureStartAudio(){
-    // improves iOS reliability: try resume on any pointerdown
+    // improves iOS reliability: try resume on any pointerdown (user gesture)
     try {
-      await initAudio();
-      await audio.ctx.resume();
+      if (!audio.ctx) {
+        await initAudio();
+      }
+      // iOS: resume must be called from user gesture
+      if (audio.ctx && audio.ctx.state !== 'running') {
+        await audio.ctx.resume();
+      }
+      // If not started yet, start audio on first gesture
+      if (!audio.started) {
+        await ensureStarted();
+        applyMix();
+      }
       // If context is running and we have started audio, we're playing
       if (audio.ctx && audio.ctx.state === 'running' && audio.started) {
         audio.playing = true;
         updatePlayButton();
       }
-    } catch {}
+    } catch (err) {
+      console.warn("gestureStartAudio failed:", err);
+    }
   }
 
   function onDown(e){
@@ -1046,6 +1012,7 @@ function makeSlider(opts){
     if (vPullEnabled && opts.canEggPull?.() && slingshotEdge === "right") {
       vPulling = true;
       vStartY = e.clientY;
+      vStartX = e.clientX;
       vOffset = 0;
     }
 
@@ -1066,12 +1033,22 @@ function makeSlider(opts){
 
     // Easter egg vertical pull tracking
     if (vPullEnabled && vPulling) {
+      const dx = Math.abs(e.clientX - vStartX);
       const dy = e.clientY - vStartY;
-      // allow pulling DOWN only
-      vOffset = Math.max(0, Math.min(140, dy));
-      // visual: move knob down while staying on right edge
-      knob.style.top = `calc(50% + ${vOffset}px)`;
-      return;
+      
+      // If user moves horizontally significantly, exit vertical pull mode and allow normal slider movement
+      if (dx > 15) {
+        vPulling = false;
+        vOffset = 0;
+        knob.style.top = "50%";
+        // Continue with normal horizontal movement below
+      } else {
+        // allow pulling DOWN only
+        vOffset = Math.max(0, Math.min(140, dy));
+        // visual: move knob down while staying on right edge
+        knob.style.top = `calc(50% + ${vOffset}px)`;
+        return;
+      }
     }
 
     const v = pxToValue(e.clientX);
@@ -1314,12 +1291,11 @@ let completionBurstState = {
   blendMet: false,
   toneMetTime: 0,
   blendMetTime: 0,
-  cooldownUntil: 0
+  lastTriggerTime: 0
 };
 
 const COMPLETION_THRESHOLD = 0.985;
 const COMPLETION_HOLD_TIME = 150; // ms
-const COMPLETION_COOLDOWN = 2500; // ms
 const COMPLETION_RESET_THRESHOLD = 0.97;
 
 function checkCompletionBurst() {
@@ -1359,19 +1335,21 @@ function checkCompletionBurst() {
     (now - completionBurstState.toneMetTime) >= COMPLETION_HOLD_TIME &&
     (now - completionBurstState.blendMetTime) >= COMPLETION_HOLD_TIME;
   
-  // Check cooldown
-  const inCooldown = now < completionBurstState.cooldownUntil;
-  
-  // Reset cooldown if sliders drop below reset threshold
+  // Reset tracking if sliders drop below reset threshold (allows retrigger)
   if (toneDisplay < COMPLETION_RESET_THRESHOLD || blendDisplay < COMPLETION_RESET_THRESHOLD) {
-    completionBurstState.cooldownUntil = 0;
+    completionBurstState.toneMet = false;
+    completionBurstState.blendMet = false;
+    completionBurstState.toneMetTime = 0;
+    completionBurstState.blendMetTime = 0;
   }
   
-  // Trigger if conditions met and not in cooldown
-  if (bothMetForDuration && !inCooldown) {
+  // Trigger if conditions met (no cooldown - allows repeated triggers)
+  // Only prevent immediate retrigger (within 100ms) to avoid spam
+  const timeSinceLastTrigger = now - completionBurstState.lastTriggerTime;
+  if (bothMetForDuration && timeSinceLastTrigger > 100) {
     panelFx.triggerCompletionBurst();
-    completionBurstState.cooldownUntil = now + COMPLETION_COOLDOWN;
-    // Reset tracking to prevent immediate retrigger
+    completionBurstState.lastTriggerTime = now;
+    // Reset tracking to allow retrigger after they move away and come back
     completionBurstState.toneMetTime = 0;
     completionBurstState.blendMetTime = 0;
   }
@@ -1396,7 +1374,7 @@ function eggPullAllowed(){
 }
 
 function eggFire({ wrap, knob }){
-  // "slingshot upwards into the top of the screen" + raining white dots + coupon popup
+  // "slingshot upwards into the top of the screen" + raining white dots
   // animate knob upward (visual only), then restore
   knob.style.transition = "transform 420ms cubic-bezier(.2,1.2,.2,1), top 420ms cubic-bezier(.2,1.2,.2,1)";
   knob.style.transform = "translate(-50%, -50%) scale(1.0) translateY(-340px)";
@@ -1409,8 +1387,6 @@ function eggFire({ wrap, knob }){
   panelFx.startRain();
   const pr = panelEl.getBoundingClientRect();
   panelFx.extravagantBurst(pr.width * 0.5 + 40, 20, 1.0);
-
-  showCoupon();
 }
 
 const sliderTone = makeSlider({
