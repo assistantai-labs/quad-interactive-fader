@@ -414,17 +414,8 @@ async function ensureStarted() {
 }
 
 async function play() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:412',message:'play() entry',data:{ctxState:audio.ctx?.state,started:audio.started,playing:audio.playing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   await ensureStarted();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:414',message:'before resume in play()',data:{ctxState:audio.ctx?.state},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   await audio.ctx.resume();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:415',message:'after resume in play()',data:{ctxState:audio.ctx?.state},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   audio.playing = true;
   updatePlayButton();
 }
@@ -482,16 +473,10 @@ function makePanelFx(canvas, panelEl) {
   }
   
   function releaseParticle(p) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:472',message:'releaseParticle',data:{poolSize:particlePool.length,willAdd:particlePool.length<100},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     if (particlePool.length < 100) particlePool.push(p);
   }
   
   function releaseShard(s) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:476',message:'releaseShard',data:{poolSize:shardPool.length,willAdd:shardPool.length<50},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     if (shardPool.length < 50) shardPool.push(s);
   }
 
@@ -549,217 +534,169 @@ function makePanelFx(canvas, panelEl) {
   }
 
   function triggerCompletionBurst() {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
+    // Get actual panel dimensions (iframe boundaries), not extended canvas
+    const panelRect = panelEl.getBoundingClientRect();
+    const w = panelRect.width;
+    const h = panelRect.height;
     const centerX = w / 2;
     const centerY = h / 2;
     
     // Check prefers-reduced-motion
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     
-    if (prefersReducedMotion) {
-      // Minimal flash only
-      fx.completion = {
-        iris: { t: 0 },
-        shards: null,
-        particles: null
-      };
-      return;
-    }
-    
-    // Layer A: Iris Flash (40-120ms)
+    // Aurora Bloom effect (Option B) - constrained to iframe
     fx.completion = {
-      iris: { t: 0 },
-      shards: { t: 0, parts: [] },
-      particles: { t: 0, parts: [] }
+      microFlash: { t: 0, centerX, centerY, w, h },
+      aurora: { t: 0, centerX, centerY, w, h },
+      sweep: prefersReducedMotion ? null : { t: 0, w, h }
     };
-    
-    // Layer B: Prismatic Shard Ring (24 shards for more intensity)
-    const numShards = 24;
-    for (let i = 0; i < numShards; i++) {
-      const shard = getShard();
-      shard.angle = (i / numShards) * Math.PI * 2;
-      // Cyan → Violet → Magenta gradient
-      shard.hue = 180 + (i / numShards) * 180;
-      fx.completion.shards.parts.push(shard);
-    }
-    
-    // Layer C: Particle Drift (80 particles for more intensity)
-    const numParticles = 80;
-    for (let i = 0; i < numParticles; i++) {
-      const p = getParticle();
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 1.2 + Math.random() * 1.8;
-      p.x = centerX;
-      p.y = centerY;
-      p.vx = Math.cos(angle) * speed;
-      p.vy = Math.sin(angle) * speed;
-      p.life = 1;
-      p.size = 2.0 + Math.random() * 3.5; // Larger particles
-      p.angle = angle;
-      p.type = Math.random() < 0.5 ? 0 : 1; // 0 = square, 1 = line
-      fx.completion.particles.parts.push(p);
-    }
   }
 
   function draw(dt) {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    const centerX = w / 2;
-    const centerY = h / 2;
-    // #region agent log
-    try {
-      ctx.clearRect(0,0,w,h);
-    } catch (err) {
-      fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:586',message:'canvas context error',data:{error:err.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      return;
-    }
-    // #endregion
+    ctx.clearRect(0,0,w,h);
+    
+    // Get panel dimensions for iframe-constrained effects
+    const panelRect = panelEl.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    // Calculate offset from canvas to panel (accounting for -40px inset)
+    const offsetX = panelRect.left - canvasRect.left;
+    const offsetY = panelRect.top - canvasRect.top;
 
-    // Completion burst effect
+    // Aurora Bloom completion effect (Option B) - constrained to iframe
     if (fx.completion) {
       const comp = fx.completion;
+      const w = comp.aurora?.w || comp.microFlash?.w || comp.sweep?.w || panelRect.width;
+      const h = comp.aurora?.h || comp.microFlash?.h || comp.sweep?.h || panelRect.height;
+      const centerX = (comp.aurora?.centerX || comp.microFlash?.centerX || w / 2) + offsetX;
+      const centerY = (comp.aurora?.centerY || comp.microFlash?.centerY || h / 2) + offsetY;
       
-      // Layer A: Iris Flash (40-120ms)
-      if (comp.iris) {
-        comp.iris.t += dt;
-        const irisDuration = 0.12;
-        if (comp.iris.t < irisDuration) {
-          let opacity = 0;
-          if (comp.iris.t < 0.04) {
-            opacity = comp.iris.t / 0.04;
-          } else {
-            opacity = 1 - ((comp.iris.t - 0.04) / (irisDuration - 0.04));
-          }
+      // Clip to panel bounds (iframe boundaries)
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(offsetX, offsetY, w, h);
+      ctx.clip();
+      
+      // Layer 1: Micro flash (0-80ms) - subtle white bloom
+      if (comp.microFlash) {
+        comp.microFlash.t += dt;
+        const flashDuration = 0.08; // 80ms
+        if (comp.microFlash.t < flashDuration) {
+          const progress = comp.microFlash.t / flashDuration;
+          // Quick fade in/out
+          const opacity = progress < 0.5 
+            ? progress * 2 * 0.4  // Fade in to 40% max
+            : (1 - progress) * 2 * 0.4; // Fade out
           
           ctx.save();
           ctx.globalCompositeOperation = "screen";
-          // Larger, brighter flash
-          const radius = Math.min(w, h) * 0.55 * (1 + comp.iris.t * 3);
+          const radius = Math.min(w, h) * 0.25 * (1 + progress * 0.5);
           const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-          grad.addColorStop(0, `rgba(255, 255, 255, ${opacity * 1.0})`);
-          grad.addColorStop(0.3, `rgba(255, 255, 255, ${opacity * 0.9})`);
-          grad.addColorStop(0.6, `rgba(255, 255, 255, ${opacity * 0.7})`);
+          grad.addColorStop(0, `rgba(255, 255, 255, ${opacity * 0.6})`);
+          grad.addColorStop(0.6, `rgba(255, 255, 255, ${opacity * 0.3})`);
           grad.addColorStop(1, `rgba(255, 255, 255, 0)`);
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
           ctx.fill();
-          // Add glow effect
-          ctx.shadowBlur = 40;
-          ctx.shadowColor = `rgba(255, 255, 255, ${opacity * 0.6})`;
+          ctx.restore();
+        } else {
+          comp.microFlash = null;
+        }
+      }
+      
+      // Layer 2: Aurora bloom (0-900ms) - radial gradient with hue shift
+      if (comp.aurora) {
+        comp.aurora.t += dt;
+        const auroraDuration = 0.9; // 900ms
+        if (comp.aurora.t < auroraDuration) {
+          const progress = comp.aurora.t / auroraDuration;
+          // Ease-out expansion
+          const eased = 1 - Math.pow(1 - progress, 2.5);
+          
+          // Hue shift: cool cyan/blue (180-200) → violet (280-300)
+          const hueStart = 190;
+          const hueEnd = 290;
+          const currentHue = hueStart + (hueEnd - hueStart) * progress;
+          
+          // Opacity fade
+          const opacity = (1 - progress) * 0.35; // Max 35% opacity, fades out
+          
+          ctx.save();
+          ctx.globalCompositeOperation = "screen";
+          const maxRadius = Math.min(w, h) * 0.4;
+          const radius = maxRadius * (0.3 + eased * 0.7); // Expand from 30% to 100%
+          
+          // Radial gradient with hue shift
+          const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+          grad.addColorStop(0, `hsla(${currentHue}, 75%, 70%, ${opacity * 0.8})`);
+          grad.addColorStop(0.4, `hsla(${currentHue}, 70%, 65%, ${opacity * 0.6})`);
+          grad.addColorStop(0.7, `hsla(${currentHue + 20}, 65%, 60%, ${opacity * 0.4})`);
+          grad.addColorStop(1, `hsla(${currentHue + 40}, 60%, 55%, 0)`);
+          
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         } else {
-          comp.iris = null;
+          comp.aurora = null;
         }
       }
       
-      // Layer B: Prismatic Shard Ring (120-650ms)
-      if (comp.shards && comp.shards.parts.length > 0) {
-        comp.shards.t += dt;
-        const shardDuration = 0.65;
-        if (comp.shards.t < shardDuration) {
-          const progress = comp.shards.t / shardDuration;
-          const eased = 1 - Math.pow(1 - progress, 3);
+      // Layer 3: Sweep wave (150-700ms) - diagonal wave left→right
+      if (comp.sweep) {
+        comp.sweep.t += dt;
+        const sweepStart = 0.15; // 150ms delay
+        const sweepDuration = 0.7; // 700ms total (ends at 850ms)
+        const sweepEnd = sweepStart + sweepDuration;
+        
+        if (comp.sweep.t >= sweepStart && comp.sweep.t < sweepEnd) {
+          const sweepProgress = (comp.sweep.t - sweepStart) / sweepDuration;
+          // Ease-out
+          const eased = 1 - Math.pow(1 - sweepProgress, 2);
+          
+          // Wave position: travels from left to right (relative to panel)
+          const waveX = offsetX - w * 0.2 + (w * 1.4) * eased;
+          const waveCenterY = offsetY + h / 2;
+          
+          // Opacity: fade in then out
+          let opacity = 1;
+          if (sweepProgress < 0.2) {
+            opacity = sweepProgress / 0.2; // Fade in
+          } else if (sweepProgress > 0.7) {
+            opacity = (1 - sweepProgress) / 0.3; // Fade out
+          }
           
           ctx.save();
           ctx.globalCompositeOperation = "screen";
-          ctx.lineCap = "round";
-          ctx.lineWidth = 3.5; // Thicker, more visible shards
           
-          for (const shard of comp.shards.parts) {
-            const dist = eased * Math.min(w, h) * 0.45; // Expand further
-            const rotation = eased * 0.2; // More rotation
-            const angle = shard.angle + rotation;
-            const shardLength = 12 + eased * 4; // Longer shards
-            const x1 = centerX + Math.cos(angle) * (dist - shardLength);
-            const y1 = centerY + Math.sin(angle) * (dist - shardLength);
-            const x2 = centerX + Math.cos(angle) * (dist + shardLength);
-            const y2 = centerY + Math.sin(angle) * (dist + shardLength);
-            
-            const life = 1 - progress;
-            const alpha = life * 1.0; // Brighter
-            const hue = shard.hue + progress * 40; // More color shift
-            // More saturated colors
-            ctx.strokeStyle = `hsla(${hue % 360}, 95%, 70%, ${alpha})`;
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = `hsla(${hue % 360}, 95%, 70%, ${alpha * 0.5})`;
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.stroke();
-          }
+          // Diagonal gradient wave (like light through fog)
+          const waveWidth = w * 0.4;
+          const grad = ctx.createLinearGradient(
+            waveX - waveWidth, waveCenterY - h * 0.6,
+            waveX + waveWidth, waveCenterY + h * 0.6
+          );
+          grad.addColorStop(0, `rgba(255, 255, 255, 0)`);
+          grad.addColorStop(0.3, `rgba(200, 220, 255, ${opacity * 0.25})`);
+          grad.addColorStop(0.5, `rgba(255, 255, 255, ${opacity * 0.35})`);
+          grad.addColorStop(0.7, `rgba(240, 200, 255, ${opacity * 0.25})`);
+          grad.addColorStop(1, `rgba(255, 255, 255, 0)`);
           
+          ctx.fillStyle = grad;
+          ctx.globalAlpha = opacity;
+          ctx.fillRect(offsetX, offsetY, w, h);
           ctx.restore();
-        } else {
-          comp.shards.parts.forEach(s => releaseShard(s));
-          comp.shards = null;
+        } else if (comp.sweep.t >= sweepEnd) {
+          comp.sweep = null;
         }
       }
       
-      // Layer C: Particle Drift (400-1600ms)
-      if (comp.particles && comp.particles.parts.length > 0) {
-        comp.particles.t += dt;
-        const particleDuration = 1.6;
-        if (comp.particles.t < particleDuration) {
-          ctx.save();
-          ctx.globalCompositeOperation = "screen";
-          
-          for (const p of comp.particles.parts) {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.vx *= 0.985; // Slower decay for longer trails
-            p.vy *= 0.985;
-            
-            const elapsed = comp.particles.t;
-            if (elapsed < 0.3) {
-              p.life = elapsed / 0.3; // Faster fade in
-            } else {
-              p.life = 1 - ((elapsed - 0.3) / (particleDuration - 0.3));
-            }
-            
-            if (p.life > 0 && p.x > -30 && p.x < w + 30 && p.y > -30 && p.y < h + 30) {
-              ctx.globalAlpha = p.life * 0.95; // Brighter particles
-              ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
-              
-              if (p.type === 0) {
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(p.angle);
-                // Add glow to squares
-                ctx.shadowBlur = 6;
-                ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
-                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-                ctx.restore();
-              } else {
-                ctx.strokeStyle = "rgba(255, 255, 255, 1.0)";
-                ctx.lineWidth = p.size * 0.7; // Thicker lines
-                ctx.lineCap = "round";
-                ctx.shadowBlur = 4;
-                ctx.shadowColor = "rgba(255, 255, 255, 0.6)";
-                ctx.beginPath();
-                ctx.moveTo(p.x - p.vx * 5, p.y - p.vy * 5); // Longer trails
-                ctx.lineTo(p.x, p.y);
-                ctx.stroke();
-              }
-            }
-          }
-          
-          ctx.restore();
-          
-          comp.particles.parts = comp.particles.parts.filter(p => {
-            const alive = p.life > 0 && p.x > -50 && p.x < w + 50 && p.y > -50 && p.y < h + 50;
-            if (!alive) releaseParticle(p);
-            return alive;
-          });
-        } else {
-          comp.particles.parts.forEach(p => releaseParticle(p));
-          comp.particles = null;
-        }
-      }
+      ctx.restore(); // Restore clip
       
-      if (!comp.iris && !comp.shards && !comp.particles) {
+      // Clean up when all layers are done
+      if (!comp.microFlash && !comp.aurora && !comp.sweep) {
         fx.completion = null;
       }
     }
@@ -1063,32 +1000,16 @@ function makeSlider(opts){
   }
 
   async function gestureStartAudio(){
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1039',message:'gestureStartAudio entry',data:{ctxState:audio.ctx?.state,started:audio.started,playing:audio.playing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     // improves iOS reliability: try resume on any pointerdown
     try {
       await initAudio();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1043',message:'before resume',data:{ctxState:audio.ctx?.state},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       await audio.ctx.resume();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1046',message:'after resume',data:{ctxState:audio.ctx?.state,started:audio.started},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // If context is running and we have started audio, we're playing
       if (audio.ctx && audio.ctx.state === 'running' && audio.started) {
         audio.playing = true;
         updatePlayButton();
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1049',message:'synced playing state',data:{playing:audio.playing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
       }
-    } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1051',message:'gestureStartAudio error',data:{error:err.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-    }
+    } catch {}
   }
 
   function onDown(e){
@@ -1096,9 +1017,6 @@ function makeSlider(opts){
     e.preventDefault();
 
     // iOS audio: attempt resume on gesture
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1057',message:'onDown calling gestureStartAudio (not awaited)',data:{pointerId:e.pointerId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     gestureStartAudio();
 
     isDown = true;
@@ -1400,22 +1318,16 @@ let completionBurstState = {
 };
 
 const COMPLETION_THRESHOLD = 0.985;
-const COMPLETION_HOLD_TIME = 120; // ms
+const COMPLETION_HOLD_TIME = 150; // ms
 const COMPLETION_COOLDOWN = 2500; // ms
-const COMPLETION_RESET_THRESHOLD = 0.95;
+const COMPLETION_RESET_THRESHOLD = 0.97;
 
 function checkCompletionBurst() {
   // Only check if sliders exist
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1348',message:'checkCompletionBurst entry',data:{sliderToneExists:!!sliderTone,sliderBlendExists:!!sliderBlend},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   if (!sliderTone || !sliderBlend) return;
   
   const now = performance.now();
-  // Use display values for continuous checking during dragging
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1354',message:'calling getDisplayValue',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
+  // Use display values for continuous checking during dragging (read-only)
   const toneDisplay = sliderTone.getDisplayValue();
   const blendDisplay = sliderBlend.getDisplayValue();
   const toneMet = toneDisplay >= COMPLETION_THRESHOLD;
@@ -1543,9 +1455,6 @@ blend = sliderBlend.value;
 
 // Continuous check for completion burst (runs every frame after sliders are created)
 function completionBurstLoop() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c39bbad8-fc29-47b4-b1ec-af2b6f554a6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1483',message:'completionBurstLoop iteration',data:{sliderToneExists:!!sliderTone,sliderBlendExists:!!sliderBlend},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   checkCompletionBurst();
   requestAnimationFrame(completionBurstLoop);
 }
