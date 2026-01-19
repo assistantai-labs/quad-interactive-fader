@@ -42,6 +42,69 @@
       padding: 40px 16px 40px;
       box-sizing: border-box;
       background: transparent;
+      position: relative;
+    }
+
+    .profileBadge {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      z-index: 10;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease-in;
+    }
+    
+    .profileBadge.visible {
+      opacity: 1;
+    }
+    
+    .profileAvatar {
+      width: clamp(144px, 19.5vw, 192px);
+      height: clamp(144px, 19.5vw, 192px);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid rgba(255,255,255,0.15);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 16px rgba(255,255,255,0.1);
+      object-fit: cover;
+      display: block;
+    }
+    
+    .profileLabel {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      padding: 6px 18px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-align: center;
+      color: rgba(255,255,255,0.9);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      white-space: nowrap;
+      margin-top: -20px;
+      position: relative;
+      z-index: 11;
+    }
+    
+    .profileLabelLine {
+      display: block;
+      line-height: 0.8;
+    }
+    
+    .profileLabelLine:first-child {
+      font-size: clamp(9px, 1.1vw, 11px);
+      margin-bottom: -4px;
+    }
+    
+    .profileLabelLine:last-child {
+      font-size: clamp(14px, 1.8vw, 18px);
     }
 
     .panel {
@@ -160,9 +223,10 @@
       border-radius: 50%;
       background: #fff;
       box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-      will-change: transform, left, top;
+      will-change: transform, left, top, clip-path;
       touch-action: none;
       z-index: 5;
+      transition: clip-path 0.05s ease-out;
     }
 
     .knob.isDown {
@@ -225,6 +289,13 @@
 <body>
   <div class="rewardWave" id="rewardWave"></div>
   <div class="stage">
+    <div class="profileBadge" id="profileBadge">
+      <img class="profileAvatar" id="profileAvatar" src="assets/IMG_7485.jpeg" alt="" onerror="this.onerror=null; this.parentElement.style.display='none'">
+      <div class="profileLabel">
+        <span class="profileLabelLine">MIXED BY</span><br>
+        <span class="profileLabelLine">QUAD808</span>
+      </div>
+    </div>
     <div class="panel" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
 
@@ -464,18 +535,21 @@ function makePanelFx(canvas, panelEl) {
   resize();
 
   function extravagantBurst(x, y, strength=1) {
-    const n = Math.floor(50 + 80 * strength);
-    const parts = [];
+    const n = Math.floor(30 + 50 * strength);
+    const parts = fx.burst?.parts || [];
     for (let i=0;i<n;i++){
-      const a = Math.random() * Math.PI * 2;
-      const sp = (3.2 + 8.5 * strength) * (0.6 + Math.random()*0.9);
+      const angle = (Math.random() * Math.PI * 2);
+      const spread = 0.3 + Math.random() * 0.4;
+      const speed = (0.5 + Math.random() * 1.5) * strength;
       parts.push({
-        x, y,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp,
+        x: x + Math.cos(angle) * spread,
+        y: y + Math.sin(angle) * spread,
+        vx: (Math.random() - 0.5) * 0.8,
+        vy: 0.3 + Math.random() * 1.2,
         life: 1,
-        size: 1.8 + Math.random()*2.8,
-        hue: (Math.random()*360)|0
+        size: 0.5 + Math.random() * 0.8,
+        hue: 120 + (Math.random() * 30),
+        settled: false
       });
     }
     fx.burst = { parts };
@@ -698,28 +772,65 @@ function makePanelFx(canvas, panelEl) {
       if (fx.rainbow.t > 0.65) fx.rainbow = null;
     }
 
-    // Burst particles
+    // Hourglass sand particles
     if (fx.burst) {
       const parts = fx.burst.parts;
       ctx.save();
       ctx.globalCompositeOperation = "screen";
+      const bottomY = h - 20; // Bottom of iframe with small margin
+      
       for (const pt of parts) {
-        pt.x += pt.vx;
-        pt.y += pt.vy;
-        pt.vx *= 0.93;
-        pt.vy *= 0.93;
-        pt.life -= 0.020;
-
-        if (pt.life > 0) {
-          ctx.fillStyle = `hsla(${pt.hue}, 95%, 62%, ${Math.max(0, pt.life)})`;
+        if (pt.settled) {
+          // Particle has settled at bottom, just draw it
+          ctx.fillStyle = `hsla(${pt.hue}, 95%, 62%, 0.8)`;
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2);
           ctx.fill();
+          continue;
         }
+        
+        // Apply gravity
+        pt.vy += 0.15; // Gravity acceleration
+        pt.vx *= 0.98; // Horizontal friction
+        
+        // Update position
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        
+        // Check if hit bottom
+        if (pt.y >= bottomY - pt.size) {
+          pt.y = bottomY - pt.size;
+          pt.vy = 0;
+          pt.vx = 0;
+          pt.settled = true;
+        }
+        
+        // Keep particles within horizontal bounds
+        if (pt.x < pt.size) {
+          pt.x = pt.size;
+          pt.vx *= -0.3; // Bounce with damping
+        } else if (pt.x > w - pt.size) {
+          pt.x = w - pt.size;
+          pt.vx *= -0.3;
+        }
+        
+        // Draw particle
+        ctx.fillStyle = `hsla(${pt.hue}, 95%, 62%, 0.9)`;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2);
+        ctx.fill();
       }
       ctx.restore();
-      fx.burst.parts = parts.filter(p => p.life > 0);
-      if (fx.burst.parts.length === 0) fx.burst = null;
+      
+      // Keep all particles (don't remove settled ones)
+      // Limit total particles to prevent memory issues
+      if (parts.length > 2000) {
+        // Remove oldest settled particles if too many
+        const settled = parts.filter(p => p.settled);
+        if (settled.length > 1000) {
+          fx.burst.parts = parts.filter(p => !p.settled || Math.random() > 0.1);
+        }
+      }
     }
 
     // Rain
@@ -813,6 +924,19 @@ function makeSlider(opts){
 
   // Overpull clamp: knob always visible, hard stop holdable
   const OVERPULL_MAX = 0.34; // allow bigger than before but not infinite
+  
+  // Morph slingshot constants
+  const MAX_OVERSCROLL = 0.15; // Maximum overscroll distance (normalized) for morphing
+  const STRETCH_THRESHOLD = 0.25; // Minimum stretch to trigger slingshot
+  const MORPH_SCALE_X = 0.65; // Horizontal stretch multiplier (more dramatic)
+  const MORPH_SCALE_Y = 0.35; // Vertical compression multiplier (more dramatic)
+  const MORPH_BULGE_FACTOR = 0.6; // How much the front bulges forward
+  
+  // Morph state
+  let overscroll = 0; // How far beyond endpoint the pointer would be (0-1 normalized)
+  let stretch = 0; // Computed stretch amount (0-1)
+  let dragDirection = 0; // -1 for left, 1 for right, 0 for none
+  let morphShake = 0; // Current shake offset
 
   function trackRect(){
     // track area is wrap inner content after padding
@@ -832,11 +956,49 @@ function makeSlider(opts){
   function setKnobFromDisplay(){
     const { r, pl, w } = trackRect();
 
-    // keep knob visible: clamp visual position to [-OVERPULL_MAX, 1+OVERPULL_MAX]
+    // Calculate overscroll for morphing - based on how far display goes beyond 0-1
+    if (isDown) {
+      const clampedDisplay = Math.max(0, Math.min(1, display));
+      const atLeftEdge = clampedDisplay <= 0.001;
+      const atRightEdge = clampedDisplay >= 0.999;
+      
+      // Check if pulling back from edge
+      const pullingBack = (atLeftEdge && target > 0.01) || (atRightEdge && target < 0.99);
+      
+      if (display < 0) {
+        overscroll = Math.abs(display);
+        dragDirection = -1;
+      } else if (display > 1) {
+        overscroll = display - 1;
+        dragDirection = 1;
+      } else if (pullingBack) {
+        overscroll = 0;
+        dragDirection = 0;
+      } else if (atLeftEdge) {
+        overscroll = 0.01;
+        dragDirection = -1;
+      } else if (atRightEdge) {
+        overscroll = 0.01;
+        dragDirection = 1;
+      } else {
+        overscroll = 0;
+        dragDirection = 0;
+      }
+      
+      stretch = Math.min(1, overscroll / MAX_OVERSCROLL);
+      if ((atLeftEdge || atRightEdge) && !pullingBack && stretch < 0.15) {
+        stretch = 0.15;
+      }
+    } else {
+      overscroll = 0;
+      stretch = 0;
+      dragDirection = 0;
+    }
+    
+    // Use original OVERPULL_MAX logic for visual position (allows ball to go slightly past)
     const d = Math.max(-OVERPULL_MAX, Math.min(1+OVERPULL_MAX, display));
 
     // compute pixel position along track, then clamp within a hard stop range that stays on screen
-    // hard stop distance is inside wrap because we have end padding.
     const x = pl + (d * w);
     const xMin = pl + (-OVERPULL_MAX * w);
     const xMax = pl + ((1+OVERPULL_MAX) * w);
@@ -847,9 +1009,68 @@ function makeSlider(opts){
 
     knob.style.left = pct + "%";
     knob.style.top = "50%";
-    knob.style.transform = `translate(-50%, -50%)${knob.classList.contains("isDown") ? " scale(var(--knobPress))" : ""}`;
+    
+    // Apply morphing transforms
+    applyMorphTransform();
 
     knob.setAttribute("aria-valuenow", String(Math.max(0, Math.min(1, value))));
+  }
+  
+  function applyMorphTransform() {
+    const isPressed = knob.classList.contains("isDown");
+    const baseScale = isPressed ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--knobPress')) || 1.4 : 1;
+    
+    // Calculate morph scales (more dramatic)
+    const scaleX = 1 + (MORPH_SCALE_X * stretch);
+    const scaleY = 1 - (MORPH_SCALE_Y * stretch);
+    
+    // Apply shake if stretch is high
+    if (stretch > 0.75) {
+      const shakeIntensity = (stretch - 0.75) / 0.25;
+      morphShake = (Math.random() - 0.5) * 1.2 * shakeIntensity * 0.4; // More dramatic shake
+    } else {
+      morphShake = 0;
+    }
+    
+    // Build transform string
+    let transform = `translate(-50%, -50%)`;
+    
+    // Apply base press scale
+    if (isPressed) {
+      transform += ` scale(${baseScale})`;
+    }
+    
+    // Apply morph scaling (after base scale) - more dramatic
+    if (stretch > 0) {
+      // Rotate to align with drag direction, then scale
+      const angle = dragDirection === 1 ? 0 : Math.PI; // 0 for right, 180 for left
+      transform += ` rotate(${angle}rad) scale(${scaleX}, ${scaleY}) rotate(${-angle}rad)`;
+    }
+    
+    // Apply shake offset
+    if (morphShake !== 0) {
+      transform += ` translate(${morphShake}px, 0)`;
+    }
+    
+    knob.style.transform = transform;
+    
+    // Apply clip-path for dramatic teardrop shape when stretched
+    if (stretch > 0.05) {
+      const knobSize = parseFloat(getComputedStyle(knob).width) || 28;
+      const radius = knobSize / 2;
+      const bulge = radius * (1 + stretch * MORPH_BULGE_FACTOR); // More dramatic bulge forward
+      const tailCompress = radius * (1 - stretch * 0.3); // Compress back more
+      
+      if (dragDirection === 1) {
+        // Stretching right - bulge points right
+        knob.style.clipPath = `ellipse(${bulge}px ${radius * scaleY}px at ${bulge}px 50%)`;
+      } else if (dragDirection === -1) {
+        // Stretching left - bulge points left
+        knob.style.clipPath = `ellipse(${bulge}px ${radius * scaleY}px at ${radius - bulge + radius}px 50%)`;
+      }
+    } else {
+      knob.style.clipPath = "";
+    }
   }
 
   function rubber(v){
@@ -887,6 +1108,7 @@ function makeSlider(opts){
   }
 
   function pulledAmount(){
+    // Use original logic: calculate based on display going beyond 0-1
     const d = Math.max(-OVERPULL_MAX, Math.min(1+OVERPULL_MAX, display));
     if (slingshotEdge === "left")  return Math.max(0, -d);
     if (slingshotEdge === "right") return Math.max(0, d - 1);
@@ -911,6 +1133,11 @@ function makeSlider(opts){
     const dir = (dest === 1) ? 1 : -1;
 
     opts.onSlingshot?.({ strength, dir, wrap, knob });
+
+    // Reset morph state before launch
+    stretch = 0;
+    overscroll = 0;
+    dragDirection = 0;
 
     const from = display;
     const start = performance.now();
@@ -1027,14 +1254,10 @@ function makeSlider(opts){
     }
 
     const v = pxToValue(e.clientX);
-
-    if (canSlingshot && slingshotEdge === "left") {
-      target = (v < 0) ? rubber(v) : v;
-    } else if (canSlingshot && slingshotEdge === "right") {
-      target = (v > 1) ? rubber(v) : v;
-    } else {
-      target = v;
-    }
+    
+    // Allow target to go beyond 0-1 for overscroll calculation
+    // Visual position will be clamped in setKnobFromDisplay
+    target = v;
   }
 
   function onMove(e){
@@ -1062,16 +1285,13 @@ function makeSlider(opts){
     }
 
     const v = pxToValue(e.clientX);
-
-    if (canSlingshot && slingshotEdge === "left") {
-      target = (v < 0) ? rubber(v) : v;
-    } else if (canSlingshot && slingshotEdge === "right") {
-      target = (v > 1) ? rubber(v) : v;
-    } else {
-      target = v;
-    }
+    
+    // Allow target to go beyond 0-1 for overscroll calculation
+    // Visual position will be clamped in setKnobFromDisplay
+    target = v;
     
     // Update audio mix immediately during dragging for real-time feedback
+    // Use clamped value for audio (0-1 range)
     const clampedTarget = Math.max(0, Math.min(1, target));
     if (opts.onChange) {
       opts.onChange(clampedTarget);
@@ -1452,6 +1672,40 @@ document.addEventListener("touchmove", (e) => {
 }, { passive:false });
 
 updatePlayButton();
+
+// Profile badge: hide if image missing, fade in if loaded
+(function(){
+  const badge = document.getElementById("profileBadge");
+  const avatar = document.getElementById("profileAvatar");
+  if (!badge || !avatar) return;
+  
+  // Check if image loads successfully
+  const showBadge = () => {
+    badge.classList.add("visible");
+  };
+  
+  const hideBadge = () => {
+    badge.style.display = "none";
+  };
+  
+  // Check image load status
+  if (avatar.complete) {
+    if (avatar.naturalWidth > 0 && avatar.naturalHeight > 0) {
+      showBadge();
+    } else {
+      hideBadge();
+    }
+  } else {
+    avatar.addEventListener("load", showBadge, { once: true });
+    avatar.addEventListener("error", hideBadge, { once: true });
+    // Also check after a short delay in case onerror fires before this
+    setTimeout(() => {
+      if (avatar.naturalWidth === 0 && avatar.naturalHeight === 0 && badge.style.display !== "none") {
+        hideBadge();
+      }
+    }, 100);
+  }
+})();
 </script>
 </body>
 </html>
