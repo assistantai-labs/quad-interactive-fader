@@ -39,7 +39,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 24px 16px;
+      padding: 40px 16px 40px;
       box-sizing: border-box;
       background: transparent;
     }
@@ -52,7 +52,7 @@
       -webkit-backdrop-filter: blur(14px);
       border: 1px solid rgba(255,255,255,0.10);
       box-shadow: 0 18px 50px rgba(0,0,0,0.55);
-      padding: 26px 26px 22px;
+      padding: 26px 26px 32px;
       box-sizing: border-box;
       color: #fff;
       position: relative;
@@ -125,6 +125,7 @@
       box-sizing: border-box;
       overflow: visible;
       z-index: 2;
+      cursor: pointer; /* Ensure cursor indicates clickability */
     }
 
     .track {
@@ -177,7 +178,8 @@
     .controls {
       display: flex;
       justify-content: center;
-      padding-top: 18px;
+      align-items: center;
+      padding-top: 20px;
       position: relative;
       z-index: 2;
     }
@@ -1001,6 +1003,7 @@ function makeSlider(opts){
 
     // IMPORTANT FIX:
     // If we're in edge-lock/slingshot mode, only start if they grabbed the knob itself.
+    // For normal interaction, allow clicking anywhere in the trackWrap hitbox
     if (canSlingshot && e.target !== knob) {
       // keep it locked, do not yank it off-edge from big hitbox
       isDown = false;
@@ -1010,6 +1013,10 @@ function makeSlider(opts){
       slingshotEdge = null;
       return;
     }
+    
+    // Normal interaction: clicking anywhere in trackWrap (including track area) should work
+    // The event listener is on wrap, so e.target will be wrap when clicking on empty trackWrap area
+    // or knob when clicking on knob, or track (but track has pointer-events: none so it passes through)
 
     // Easter egg vertical pull (bottom slider only): only when BOTH sliders right AND bottom at right AND slingshot-armed
     if (vPullEnabled && opts.canEggPull?.() && slingshotEdge === "right") {
