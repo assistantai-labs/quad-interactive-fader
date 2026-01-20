@@ -819,17 +819,23 @@ function makePanelFx(canvas, panelEl) {
       
       for (const pt of parts) {
         if (pt.settled) {
-          // Particle has settled at bottom, just draw it
-          ctx.fillStyle = `hsla(${pt.hue}, 95%, 62%, 0.8)`;
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2);
-          ctx.fill();
-          continue;
+          // Check if settled particle gets disturbed (e.g., by other particles bouncing)
+          // Allow settled particles to become active again if they move
+          if (Math.abs(pt.vx) > 0.01 || Math.abs(pt.vy) > 0.01) {
+            pt.settled = false;
+          } else {
+            // Particle has settled at bottom, just draw it
+            ctx.fillStyle = `hsla(${pt.hue}, 95%, 62%, 0.8)`;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2);
+            ctx.fill();
+            continue;
+          }
         }
         
         // Apply gravity (always pulling down)
         pt.vy += 0.15; // Gravity acceleration
-        pt.vx *= 0.98; // Horizontal friction
+        pt.vx *= 0.99; // Less horizontal friction for more bounce
         
         // Update position
         pt.x += pt.vx;
@@ -899,18 +905,18 @@ function makePanelFx(canvas, panelEl) {
         
         // Check if particle is outside bounds and push it back in
         if (!isInsideRoundedRect(pt.x, pt.y, pt.size)) {
-          // Push particle back inside
+          // Push particle back inside with bouncy response
           if (relX < margin) {
             pt.x = canvasOffset + margin;
-            pt.vx *= -0.5;
+            pt.vx *= -0.85; // More bouncy
           } else if (relX > panelW - margin) {
             pt.x = canvasOffset + panelW - margin;
-            pt.vx *= -0.5;
+            pt.vx *= -0.85; // More bouncy
           }
           
           if (relY < margin) {
             pt.y = canvasOffset + margin;
-            pt.vy *= -0.5;
+            pt.vy *= -0.85; // More bouncy
           } else if (relY > panelH - margin) {
             // Handle bottom edge and corners
             const isInLeftCorner = relX < r;
@@ -928,8 +934,11 @@ function makePanelFx(canvas, panelEl) {
                 const angle = Math.atan2(dy, dx);
                 pt.x = cornerX + Math.cos(angle) * maxDist;
                 pt.y = cornerY + Math.sin(angle) * maxDist;
-                pt.vx *= 0.3;
-                pt.vy *= 0.3;
+                // Bounce off corner curve
+                const normalAngle = angle + Math.PI;
+                const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.7;
+                pt.vx = Math.cos(normalAngle) * bounceSpeed;
+                pt.vy = Math.sin(normalAngle) * bounceSpeed;
               }
             } else if (isInRightCorner) {
               // Bottom-right corner - constrain to curve
@@ -943,8 +952,11 @@ function makePanelFx(canvas, panelEl) {
                 const angle = Math.atan2(dy, dx);
                 pt.x = cornerX + Math.cos(angle) * maxDist;
                 pt.y = cornerY + Math.sin(angle) * maxDist;
-                pt.vx *= 0.3;
-                pt.vy *= 0.3;
+                // Bounce off corner curve
+                const normalAngle = angle + Math.PI;
+                const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.7;
+                pt.vx = Math.cos(normalAngle) * bounceSpeed;
+                pt.vy = Math.sin(normalAngle) * bounceSpeed;
               }
             } else {
               // Flat bottom edge
@@ -953,21 +965,23 @@ function makePanelFx(canvas, panelEl) {
           }
         }
         
-        // Check if hit bottom (only settle on flat bottom, not in corners)
+        // Check if hit bottom - make floor bouncy for all particles
         if (pt.y >= bottomY - pt.size) {
           const isInLeftCorner = relX < r;
           const isInRightCorner = relX > panelW - r;
           
-          // Only settle if on flat bottom edge (not in corners)
-          if (!isInLeftCorner && !isInRightCorner) {
-            pt.y = bottomY - pt.size;
+          pt.y = bottomY - pt.size;
+          
+          // Always bounce off floor unless velocity is extremely low
+          if (Math.abs(pt.vy) > 0.05) {
+            pt.vy *= -0.85; // Bounce with good energy retention
+            pt.vx *= 0.98; // Minimal horizontal friction to keep bouncing
+            pt.settled = false; // Never settle while bouncing
+          } else {
+            // Only settle if velocity is extremely low (almost stopped)
             pt.vy = 0;
             pt.vx = 0;
             pt.settled = true;
-          } else {
-            // In corner - keep it moving/sliding
-            pt.vy *= 0.95;
-            pt.vx *= 0.95;
           }
         }
         
