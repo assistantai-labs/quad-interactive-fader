@@ -25,8 +25,8 @@
       margin: 0;
       padding: 0;
       background: transparent;
-      overflow-x: clip; /* Prevent horizontal scrolling */
-      overflow-y: auto; /* Allow vertical scrolling */
+      overflow: hidden; /* Prevent all scrolling on frame */
+      position: fixed; /* Lock position to prevent scrolling */
     }
 
     body {
@@ -36,7 +36,11 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
-      touch-action: auto; /* Allow scrolling on body */
+      touch-action: none; /* Prevent all touch gestures that could cause scrolling */
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+      height: 100%;
     }
 
     .stage {
@@ -53,8 +57,7 @@
       background: transparent;
       position: relative;
       gap: 20px;
-      overflow-x: clip; /* Prevent horizontal overflow */
-      overflow-y: auto; /* Allow vertical scrolling if needed */
+      overflow: hidden; /* Prevent all scrolling */
     }
 
     .profileBadge {
@@ -205,6 +208,7 @@
       position: relative;
       overflow: visible; /* allow FX beyond bounds */
       flex-shrink: 1; /* Allow panel to shrink on mobile */
+      touch-action: none; /* Prevent touch scrolling gestures */
     }
 
     /* Panel-wide FX overlay so explosions never clip */
@@ -269,7 +273,7 @@
       height: var(--hitH);
       display: flex;
       align-items: center;
-      touch-action: none;
+      touch-action: pan-x; /* Only allow horizontal panning for slider, prevent vertical scroll */
       padding-left: var(--endPad);
       padding-right: var(--endPad);
       box-sizing: border-box;
@@ -367,6 +371,13 @@
 
 
     @media (max-width: 520px){
+      html, body {
+        overflow: hidden !important;
+        position: fixed !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+      
       .stage {
         padding: 4px 8px 4px;
         gap: 6px;
@@ -376,7 +387,8 @@
         justify-content: flex-start;
         padding-top: max(4px, env(safe-area-inset-top));
         padding-bottom: max(4px, env(safe-area-inset-bottom));
-        overflow: hidden; /* Prevent scrolling */
+        overflow: hidden !important; /* Prevent all scrolling */
+        position: relative;
       }
       
       /* EXACT HEIGHTS FOR MOBILE:
@@ -402,6 +414,7 @@
         z-index: 1;
         position: relative;
         order: -1; /* Force visualizer above panel */
+        overflow: hidden;
       }
       
       .panel {
@@ -414,8 +427,9 @@
         max-height: calc(100vh - 28vh - 6px - 8px); /* EXACT: remaining space */
         display: flex;
         flex-direction: column;
-        overflow: hidden; /* Prevent panel from overflowing */
+        overflow: hidden !important; /* Prevent panel from overflowing */
         order: 1; /* Force panel below visualizer */
+        position: relative;
       }
       
       .rows {
@@ -432,6 +446,7 @@
         padding-bottom: 0;
         margin-bottom: 0;
         flex-shrink: 0;
+        position: relative;
       }
       
       :root {
@@ -2950,7 +2965,8 @@ setTimeout(() => {
   console.log('3D Spectrogram visualizer initialized');
 }, 100); // Wait 100ms for DOM to be fully ready
 
-// Only prevent scrolling when actively dragging sliders, not when scrolling the page
+// Prevent all scrolling within the iframe - frame should not be scrollable
+// Only allow slider interactions, no page scrolling
 let isDraggingSlider = false;
 let touchStartY = 0;
 let touchStartX = 0;
@@ -2972,7 +2988,8 @@ document.addEventListener("touchstart", (e) => {
 document.addEventListener("touchmove", (e) => {
   const target = e.target;
   
-  // Only prevent scroll if actively dragging a slider horizontally
+  // Prevent all scrolling - frame should not scroll
+  // Only allow slider dragging
   if (firstGestureDone && panelEl && panelEl.contains(target)) {
     const trackWrap = target.closest('.trackWrap');
     if (trackWrap && e.touches.length > 0) {
@@ -2980,16 +2997,24 @@ document.addEventListener("touchmove", (e) => {
       const deltaY = Math.abs(touch.clientY - touchStartY);
       const deltaX = Math.abs(touch.clientX - touchStartX);
       
-      // If horizontal movement is greater than vertical, it's a slider drag
+      // If horizontal movement is greater than vertical, it's a slider drag - allow it
       if (deltaX > 10 && deltaX > deltaY * 1.5) {
         isDraggingSlider = true;
-        e.preventDefault();
+        e.preventDefault(); // Prevent scroll during slider drag
       } else if (isDraggingSlider && deltaX > 5) {
         // Continue preventing scroll while dragging
         e.preventDefault();
+      } else {
+        // Prevent all other scrolling within frame
+        e.preventDefault();
       }
-      // Otherwise allow page scrolling
+    } else {
+      // Prevent scrolling anywhere else in the frame
+      e.preventDefault();
     }
+  } else {
+    // Prevent scrolling outside panel area too
+    e.preventDefault();
   }
 }, { passive: false });
 
