@@ -564,8 +564,8 @@ function makePanelFx(canvas, panelEl) {
     // Slider stops exactly at destination (0 or 1), no overshoot
     let slingshotSpeedPerFrame;
     if (trackWidth && pullDistance !== null) {
-      // Calculate actual slingshot duration (with 2.5x multiplier)
-      const slingshotDurationMs = (235 - (strength * 55)) * 2.5;
+      // Calculate actual slingshot duration (with 0.4x multiplier for faster speed)
+      const slingshotDurationMs = (235 - (strength * 55)) * 0.4;
       const slingshotDuration = slingshotDurationMs / 1000; // Convert to seconds
       
       // The slider travels from current position to destination (0 or 1)
@@ -578,25 +578,25 @@ function makePanelFx(canvas, panelEl) {
       
       // Convert to pixels per frame (assuming 60fps)
       // Reduce speed for small balls (make them slower)
-      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.4; // 40% of slider speed
+      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.25; // 25% of slider speed (half of half speed)
     } else if (trackWidth) {
       // Fallback: use strength-based calculation
-      const slingshotDurationMs = (235 - (strength * 55)) * 2.5;
+      const slingshotDurationMs = (235 - (strength * 55)) * 0.4;
       const slingshotDuration = slingshotDurationMs / 1000;
       const normalizedDistance = 1; // Full track width, no overshoot
       const actualDistance = trackWidth * normalizedDistance;
       const constantVelocity = actualDistance / slingshotDuration;
-      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.4; // 40% of slider speed
+      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.25; // 25% of slider speed (half of half speed)
     } else {
       // Fallback: estimate from panel width
       const panelRect = panelEl.getBoundingClientRect();
       const estimatedTrackWidth = panelRect.width * 0.8;
-      const slingshotDurationMs = (235 - (strength * 55)) * 2.5;
+      const slingshotDurationMs = (235 - (strength * 55)) * 0.4;
       const slingshotDuration = slingshotDurationMs / 1000;
       const normalizedDistance = 1; // Full track width, no overshoot
       const actualDistance = estimatedTrackWidth * normalizedDistance;
       const constantVelocity = actualDistance / slingshotDuration;
-      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.4; // 40% of slider speed
+      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.25; // 25% of slider speed (half of half speed)
     }
     
     for (let i=0;i<n;i++){
@@ -646,17 +646,10 @@ function makePanelFx(canvas, panelEl) {
     const panelRect = panelEl.getBoundingClientRect();
     const w = panelRect.width;
     const h = panelRect.height;
-    const centerX = w / 2;
-    const centerY = h / 2;
     
-    // Check prefers-reduced-motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    
-    // Aurora Bloom effect (Option B) - constrained to iframe
+    // White frame effect - lights up around the iframe
     fx.completion = {
-      microFlash: { t: 0, centerX, centerY, w, h },
-      aurora: { t: 0, centerX, centerY, w, h },
-      sweep: prefersReducedMotion ? null : { t: 0, w, h }
+      frame: { t: 0, w, h }
     };
   }
 
@@ -672,139 +665,66 @@ function makePanelFx(canvas, panelEl) {
     const offsetX = panelRect.left - canvasRect.left;
     const offsetY = panelRect.top - canvasRect.top;
 
-    // Aurora Bloom completion effect (Option B) - constrained to iframe
+    // White frame effect - lights up around the iframe when both sliders are on one side
     if (fx.completion) {
       const comp = fx.completion;
-      const w = comp.aurora?.w || comp.microFlash?.w || comp.sweep?.w || panelRect.width;
-      const h = comp.aurora?.h || comp.microFlash?.h || comp.sweep?.h || panelRect.height;
-      const centerX = (comp.aurora?.centerX || comp.microFlash?.centerX || w / 2) + offsetX;
-      const centerY = (comp.aurora?.centerY || comp.microFlash?.centerY || h / 2) + offsetY;
+      const frameW = comp.frame?.w || panelRect.width;
+      const frameH = comp.frame?.h || panelRect.height;
       
-      // Clip to panel bounds (iframe boundaries)
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(offsetX, offsetY, w, h);
-      ctx.clip();
-      
-      // Layer 1: Micro flash (0-80ms) - subtle white bloom
-      if (comp.microFlash) {
-        comp.microFlash.t += dt;
-        const flashDuration = 0.08; // 80ms
-        if (comp.microFlash.t < flashDuration) {
-          const progress = comp.microFlash.t / flashDuration;
-          // Quick fade in/out
-          const opacity = progress < 0.5 
-            ? progress * 2 * 0.4  // Fade in to 40% max
-            : (1 - progress) * 2 * 0.4; // Fade out
-          
-          ctx.save();
-          ctx.globalCompositeOperation = "screen";
-          const radius = Math.min(w, h) * 0.25 * (1 + progress * 0.5);
-          const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-          grad.addColorStop(0, `rgba(255, 255, 255, ${opacity * 0.6})`);
-          grad.addColorStop(0.6, `rgba(255, 255, 255, ${opacity * 0.3})`);
-          grad.addColorStop(1, `rgba(255, 255, 255, 0)`);
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        } else {
-          comp.microFlash = null;
-        }
-      }
-      
-      // Layer 2: Aurora bloom (0-900ms) - radial gradient with hue shift
-      if (comp.aurora) {
-        comp.aurora.t += dt;
-        const auroraDuration = 0.9; // 900ms
-        if (comp.aurora.t < auroraDuration) {
-          const progress = comp.aurora.t / auroraDuration;
-          // Ease-out expansion
-          const eased = 1 - Math.pow(1 - progress, 2.5);
-          
-          // Hue shift: cool cyan/blue (180-200) → violet (280-300)
-          const hueStart = 190;
-          const hueEnd = 290;
-          const currentHue = hueStart + (hueEnd - hueStart) * progress;
-          
-          // Opacity fade
-          const opacity = (1 - progress) * 0.35; // Max 35% opacity, fades out
-          
-          ctx.save();
-          ctx.globalCompositeOperation = "screen";
-          const maxRadius = Math.min(w, h) * 0.4;
-          const radius = maxRadius * (0.3 + eased * 0.7); // Expand from 30% to 100%
-          
-          // Radial gradient with hue shift
-          const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-          grad.addColorStop(0, `hsla(${currentHue}, 75%, 70%, ${opacity * 0.8})`);
-          grad.addColorStop(0.4, `hsla(${currentHue}, 70%, 65%, ${opacity * 0.6})`);
-          grad.addColorStop(0.7, `hsla(${currentHue + 20}, 65%, 60%, ${opacity * 0.4})`);
-          grad.addColorStop(1, `hsla(${currentHue + 40}, 60%, 55%, 0)`);
-          
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        } else {
-          comp.aurora = null;
-        }
-      }
-      
-      // Layer 3: Sweep wave (150-700ms) - diagonal wave left→right
-      if (comp.sweep) {
-        comp.sweep.t += dt;
-        const sweepStart = 0.15; // 150ms delay
-        const sweepDuration = 0.7; // 700ms total (ends at 850ms)
-        const sweepEnd = sweepStart + sweepDuration;
-        
-        if (comp.sweep.t >= sweepStart && comp.sweep.t < sweepEnd) {
-          const sweepProgress = (comp.sweep.t - sweepStart) / sweepDuration;
-          // Ease-out
-          const eased = 1 - Math.pow(1 - sweepProgress, 2);
-          
-          // Wave position: travels from left to right (relative to panel)
-          const waveX = offsetX - w * 0.2 + (w * 1.4) * eased;
-          const waveCenterY = offsetY + h / 2;
-          
-          // Opacity: fade in then out
-          let opacity = 1;
-          if (sweepProgress < 0.2) {
-            opacity = sweepProgress / 0.2; // Fade in
-          } else if (sweepProgress > 0.7) {
-            opacity = (1 - sweepProgress) / 0.3; // Fade out
+      if (comp.frame) {
+        comp.frame.t += dt;
+        const frameDuration = 0.6; // 600ms duration
+        if (comp.frame.t < frameDuration) {
+          const progress = comp.frame.t / frameDuration;
+          // Fade in quickly, hold, then fade out
+          let opacity;
+          if (progress < 0.2) {
+            opacity = progress / 0.2; // Fade in to 100%
+          } else if (progress < 0.7) {
+            opacity = 1.0; // Hold at 100%
+          } else {
+            opacity = 1.0 * (1 - (progress - 0.7) / 0.3); // Fade out
           }
           
           ctx.save();
-          ctx.globalCompositeOperation = "screen";
+          ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+          ctx.lineWidth = 4; // Frame thickness
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
           
-          // Diagonal gradient wave (like light through fog)
-          const waveWidth = w * 0.4;
-          const grad = ctx.createLinearGradient(
-            waveX - waveWidth, waveCenterY - h * 0.6,
-            waveX + waveWidth, waveCenterY + h * 0.6
-          );
-          grad.addColorStop(0, `rgba(255, 255, 255, 0)`);
-          grad.addColorStop(0.3, `rgba(200, 220, 255, ${opacity * 0.25})`);
-          grad.addColorStop(0.5, `rgba(255, 255, 255, ${opacity * 0.35})`);
-          grad.addColorStop(0.7, `rgba(240, 200, 255, ${opacity * 0.25})`);
-          grad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+          // Draw white frame around the iframe
+          const frameX = offsetX;
+          const frameY = offsetY;
+          const borderRadius = 22; // Match panel border-radius
           
-          ctx.fillStyle = grad;
-          ctx.globalAlpha = opacity;
-          ctx.fillRect(offsetX, offsetY, w, h);
+          ctx.beginPath();
+          // Top-left corner to top-right
+          ctx.moveTo(frameX + borderRadius, frameY);
+          ctx.lineTo(frameX + frameW - borderRadius, frameY);
+          // Top-right corner
+          ctx.arc(frameX + frameW - borderRadius, frameY + borderRadius, borderRadius, -Math.PI / 2, 0);
+          // Right side
+          ctx.lineTo(frameX + frameW, frameY + frameH - borderRadius);
+          // Bottom-right corner
+          ctx.arc(frameX + frameW - borderRadius, frameY + frameH - borderRadius, borderRadius, 0, Math.PI / 2);
+          // Bottom side
+          ctx.lineTo(frameX + borderRadius, frameY + frameH);
+          // Bottom-left corner
+          ctx.arc(frameX + borderRadius, frameY + frameH - borderRadius, borderRadius, Math.PI / 2, Math.PI);
+          // Left side
+          ctx.lineTo(frameX, frameY + borderRadius);
+          // Top-left corner
+          ctx.arc(frameX + borderRadius, frameY + borderRadius, borderRadius, Math.PI, -Math.PI / 2);
+          ctx.closePath();
+          ctx.stroke();
           ctx.restore();
-        } else if (comp.sweep.t >= sweepEnd) {
-          comp.sweep = null;
+        } else {
+          comp.frame = null;
         }
       }
       
-      ctx.restore(); // Restore clip
-      
-      // Clean up when all layers are done
-      if (!comp.microFlash && !comp.aurora && !comp.sweep) {
+      // Clean up when done
+      if (!comp.frame) {
         fx.completion = null;
       }
     }
@@ -930,18 +850,8 @@ function makePanelFx(canvas, panelEl) {
           }
         }
         
-        // Apply gravity only near the bottom of the frame
-        const particleRelY = pt.y - canvasOffset;
-        const gravityZone = panelH * 0.3; // Gravity zone is bottom 30% of frame
-        const distanceFromBottom = panelH - particleRelY;
-        
-        if (distanceFromBottom < gravityZone && distanceFromBottom > 0) {
-          // Gravity strength increases as particle gets closer to bottom (slower)
-          const gravityStrength = (1 - distanceFromBottom / gravityZone) * 0.08; // Reduced gravity for slower movement
-          pt.vy += gravityStrength; // Gravity only in bottom zone
-        }
-        
-        pt.vx *= 0.995; // More friction for slower movement
+        // No gravity - particles move freely
+        pt.vx *= 0.995; // Friction for slower movement
         
         // Update position
         pt.x += pt.vx;
@@ -1011,18 +921,18 @@ function makePanelFx(canvas, panelEl) {
         
         // Check if particle is outside bounds and push it back in
         if (!isInsideRoundedRect(pt.x, pt.y, pt.size)) {
-          // Push particle back inside with extremely bouncy response
+          // Push particle back inside with low bounce response
           if (relX < margin) {
             pt.x = canvasOffset + margin;
-            pt.vx *= -0.95; // Extremely bouncy
+            pt.vx *= -0.3; // Way less bouncy
           } else if (relX > panelW - margin) {
             pt.x = canvasOffset + panelW - margin;
-            pt.vx *= -0.95; // Extremely bouncy
+            pt.vx *= -0.3; // Way less bouncy
           }
           
           if (relY < margin) {
             pt.y = canvasOffset + margin;
-            pt.vy *= -0.95; // Extremely bouncy
+            pt.vy *= -0.3; // Way less bouncy
           } else if (relY > panelH - margin) {
             // Handle bottom edge and corners
             const isInLeftCorner = relX < r;
@@ -1040,9 +950,9 @@ function makePanelFx(canvas, panelEl) {
                 const angle = Math.atan2(dy, dx);
                 pt.x = cornerX + Math.cos(angle) * maxDist;
                 pt.y = cornerY + Math.sin(angle) * maxDist;
-                // Bounce off corner curve - extremely bouncy
+                // Bounce off corner curve - way less bouncy
                 const normalAngle = angle + Math.PI;
-                const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.95;
+                const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
                 pt.vx = Math.cos(normalAngle) * bounceSpeed;
                 pt.vy = Math.sin(normalAngle) * bounceSpeed;
               }
@@ -1058,9 +968,9 @@ function makePanelFx(canvas, panelEl) {
                 const angle = Math.atan2(dy, dx);
                 pt.x = cornerX + Math.cos(angle) * maxDist;
                 pt.y = cornerY + Math.sin(angle) * maxDist;
-                // Bounce off corner curve - extremely bouncy
+                // Bounce off corner curve - way less bouncy
                 const normalAngle = angle + Math.PI;
-                const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.95;
+                const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
                 pt.vx = Math.cos(normalAngle) * bounceSpeed;
                 pt.vy = Math.sin(normalAngle) * bounceSpeed;
               }
@@ -1078,11 +988,11 @@ function makePanelFx(canvas, panelEl) {
           
           pt.y = bottomY - pt.size;
           
-          // Extremely bouncy - very high bounce coefficient
-          const bounceMultiplier = 0.95 + (audioIntensity * 0.05); // 0.95 to 1.0 (extremely bouncy)
+          // Way less bouncy - low bounce coefficient
+          const bounceMultiplier = 0.3 + (audioIntensity * 0.1); // 0.3 to 0.4 (way less bouncy)
           if (Math.abs(pt.vy) > 0.01) {
-            pt.vy *= -bounceMultiplier; // Extremely bouncy (no upward boost from audio)
-            pt.vx *= 0.99; // Minimal horizontal friction to keep bouncing
+            pt.vy *= -bounceMultiplier; // Way less bouncy (no upward boost from audio)
+            pt.vx *= 0.99; // Minimal horizontal friction
             pt.settled = false; // Never settle while bouncing
           } else {
             // Only settle if velocity is extremely low (almost stopped) and audio is quiet
@@ -1091,8 +1001,8 @@ function makePanelFx(canvas, panelEl) {
               pt.vx = 0;
               pt.settled = true;
             } else {
-              // Audio is playing, keep it extremely bouncy
-              pt.vy *= -0.95;
+              // Audio is playing, keep it slightly bouncy
+              pt.vy *= -0.3;
               pt.settled = false;
             }
           }
@@ -1224,6 +1134,7 @@ function makeSlider(opts){
   let canSlingshot = false;
   let slingshotEdge = null;
   let dragStartTime = 0;
+  let knobHidden = false; // Track if knob is hidden after explosion
 
   let lastSettleTime = performance.now();
 
@@ -1456,8 +1367,11 @@ function makeSlider(opts){
 
     const from = display;
     const start = performance.now();
-    const dur = (235 - (strength * 55)) * 2.5; // Slower slingshot (2.5x duration)
+    const dur = (235 - (strength * 55)) * 0.4; // Much faster slingshot (0.4x duration)
 
+    let exploded = false; // Track if explosion has happened
+    let explosionTime = 0; // Time when explosion happened
+    
     function tick(now){
       const t = Math.min(1, (now - start) / dur);
 
@@ -1465,21 +1379,52 @@ function makeSlider(opts){
       if (t < 1) {
         // Constant speed: linear interpolation
         display = from + (dest - from) * t;
+        setKnobFromDisplay();
       } else {
-        // Instantly stop at destination
+        // Instantly stop at destination - explode when hitting the wall
         display = dest;
+        setKnobFromDisplay(); // Set position first
+        
+        // Hide knob and create explosion effect when it hits the wall
+        if (!exploded) {
+          exploded = true;
+          explosionTime = now;
+          knobHidden = true;
+          knob.style.opacity = "0";
+          knob.style.transition = "opacity 30ms linear";
+          
+          // Get knob position for explosion (at the wall)
+          const knobRect = knob.getBoundingClientRect();
+          const panelRect = panelEl.getBoundingClientRect();
+          const explosionX = (knobRect.left - panelRect.left) + (knobRect.width / 2) + 40; // Account for canvas offset
+          const explosionY = (knobRect.top - panelRect.top) + (knobRect.height / 2) + 40;
+          
+          // Create explosion at knob position
+          const trackWidth = wrap.getBoundingClientRect().width;
+          panelFx.extravagantBurst(explosionX, explosionY, strength, trackWidth, pullDistance);
+        }
       }
 
       // Clamp to valid range (0 to 1)
       display = Math.max(0, Math.min(1, display));
-      setKnobFromDisplay();
 
       if (t < 1) requestAnimationFrame(tick);
       else {
         value = dest;
         target = dest;
         display = dest;
-        setKnobFromDisplay();
+        
+        // Fade in knob at the same speed balls fade out (starts at 2s, fades over 2s, ends at 4s)
+        const fadeStartTime = 2000; // Start fading in when balls start fading out (2s)
+        const fadeDuration = 2000; // Fade in over 2 seconds (same as balls fade out)
+        
+        // Start fade in
+        setTimeout(() => {
+          knob.style.transition = `opacity ${fadeDuration}ms linear`;
+          knob.style.opacity = "1";
+          knobHidden = false; // Re-enable interaction as it fades in
+        }, fadeStartTime);
+        
         lastSettleTime = performance.now();
         opts.onChange?.(value);
         opts.onSlingshotLand?.({ strength, dest, wrap, knob, pullDistance });
@@ -1524,6 +1469,8 @@ function makeSlider(opts){
 
   function onDown(e){
     if (isDown) return;
+    // Prevent interaction if knob is hidden after explosion
+    if (knobHidden) return;
     e.preventDefault();
 
     // iOS audio: attempt resume on gesture
@@ -1891,7 +1838,17 @@ function checkCompletionBurst() {
   if (bothMetForDuration && timeSinceLastTrigger > 100) {
     panelFx.triggerCompletionBurst();
     completionBurstState.lastTriggerTime = now;
-    // Reset tracking to allow retrigger after they move away and come back
+  }
+  
+  // Keep frame lit while both sliders are on the right side
+  if (bothMetForDuration) {
+    // Continuously trigger to keep frame visible
+    if (timeSinceLastTrigger > 600) { // Re-trigger every 600ms to keep frame visible
+      panelFx.triggerCompletionBurst();
+      completionBurstState.lastTriggerTime = now;
+    }
+  } else {
+    // Reset tracking when sliders move away
     completionBurstState.toneMetTime = 0;
     completionBurstState.blendMetTime = 0;
   }
