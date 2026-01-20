@@ -48,15 +48,22 @@
     .profileBadge {
       position: absolute;
       bottom: 20px;
-      right: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 0;
       z-index: 10;
-      pointer-events: none;
+      pointer-events: auto;
       opacity: 0;
       transition: opacity 200ms ease-in;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    
+    .profileBadge:hover {
+      opacity: 0.9;
     }
     
     .profileBadge.visible {
@@ -288,13 +295,13 @@
 <body>
   <div class="rewardWave" id="rewardWave"></div>
   <div class="stage">
-    <div class="profileBadge" id="profileBadge">
+    <a href="https://www.quad808.com/quad" target="_blank" class="profileBadge" id="profileBadge">
       <img class="profileAvatar" id="profileAvatar" src="assets/IMG_7485.jpeg" alt="" onerror="this.onerror=null; this.parentElement.style.display='none'">
       <div class="profileLabel">
         <span class="profileLabelLine">MIXED BY</span><br>
         <span class="profileLabelLine">QUAD808</span>
       </div>
-    </div>
+    </a>
     <div class="panel" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
 
