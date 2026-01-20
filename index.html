@@ -365,33 +365,40 @@
 
     @media (max-width: 520px){
       .stage {
-        padding: 8px 12px 8px;
-        gap: 10px;
+        padding: 6px 10px 6px;
+        gap: 8px;
         min-height: 100vh;
         height: auto;
         max-height: 100vh;
         justify-content: flex-start;
-        padding-top: max(8px, env(safe-area-inset-top));
-        padding-bottom: max(8px, env(safe-area-inset-bottom));
+        padding-top: max(6px, env(safe-area-inset-top));
+        padding-bottom: max(6px, env(safe-area-inset-bottom));
       }
       
       .viz3d {
         width: 100%;
         max-width: 100%;
-        height: min(35vh, 240px);
-        margin: 0 auto;
+        height: min(32vh, 220px);
+        min-height: 180px;
+        margin: 0 auto 0 auto;
         flex-shrink: 0;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 1;
+        position: relative;
       }
       
       .panel {
         width: 100%;
         max-width: 100%;
-        padding: 12px 10px 12px;
+        padding: 10px 8px 10px;
         border-radius: 18px;
         flex: 1 1 auto;
         min-height: 0;
         display: flex;
         flex-direction: column;
+        max-height: calc(100vh - min(32vh, 220px) - 30px);
       }
       
       .rows {
@@ -399,11 +406,11 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 4px;
       }
       
       .controls {
-        padding-top: 8px;
+        padding-top: 6px;
         flex-shrink: 0;
       }
       
@@ -2311,8 +2318,16 @@ setTimeout(() => {
   // Ensure container has dimensions
   if (viz3dContainer.clientWidth === 0 || viz3dContainer.clientHeight === 0) {
     console.warn('Container has no dimensions, setting defaults');
-    viz3dContainer.style.width = 'min(920px, 96vw)';
-    viz3dContainer.style.height = '400px';
+    // Use viewport-based sizing for mobile
+    const isMobile = window.innerWidth <= 520;
+    if (isMobile) {
+      viz3dContainer.style.width = '100%';
+      viz3dContainer.style.height = 'min(35vh, 240px)';
+      viz3dContainer.style.minHeight = '200px';
+    } else {
+      viz3dContainer.style.width = 'min(920px, 96vw)';
+      viz3dContainer.style.height = '400px';
+    }
   }
   
   console.log('Initializing 3D spectrogram, container size:', viz3dContainer.clientWidth, 'x', viz3dContainer.clientHeight);
@@ -2321,9 +2336,12 @@ setTimeout(() => {
   const scene = new THREE.Scene();
   scene.background = null; // Transparent background
   
-  // Ensure container has dimensions
-  const width = Math.max(viz3dContainer.clientWidth, 400);
-  const height = Math.max(viz3dContainer.clientHeight, 300);
+  // Ensure container has dimensions - use actual container size or mobile defaults
+  const isMobile = window.innerWidth <= 520;
+  const defaultWidth = isMobile ? Math.max(viz3dContainer.clientWidth || window.innerWidth - 24, 300) : 400;
+  const defaultHeight = isMobile ? Math.max(viz3dContainer.clientHeight || 200, 200) : 300;
+  const width = Math.max(viz3dContainer.clientWidth || defaultWidth, defaultWidth);
+  const height = Math.max(viz3dContainer.clientHeight || defaultHeight, defaultHeight);
   
   const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
   
@@ -2885,8 +2903,11 @@ setTimeout(() => {
   
   // Step 10: Handle resize
   function handleResize() {
-    const width = Math.max(viz3dContainer.clientWidth, 400);
-    const height = Math.max(viz3dContainer.clientHeight, 300);
+    const isMobile = window.innerWidth <= 520;
+    const defaultWidth = isMobile ? Math.max(viz3dContainer.clientWidth || window.innerWidth - 24, 300) : 400;
+    const defaultHeight = isMobile ? Math.max(viz3dContainer.clientHeight || 180, 180) : 300;
+    const width = Math.max(viz3dContainer.clientWidth || defaultWidth, defaultWidth);
+    const height = Math.max(viz3dContainer.clientHeight || defaultHeight, defaultHeight);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
