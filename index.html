@@ -40,7 +40,8 @@
     }
 
     .stage {
-      min-height: 100%;
+      min-height: 100vh;
+      height: 100vh;
       width: 100%;
       max-width: 100%;
       display: flex;
@@ -53,6 +54,7 @@
       position: relative;
       gap: 20px;
       overflow-x: clip; /* Prevent horizontal overflow */
+      overflow-y: auto; /* Allow vertical scrolling if needed */
     }
 
     .profileBadge {
@@ -138,6 +140,7 @@
       overflow: hidden; /* Prevent content from extending beyond bounds */
       box-shadow: none; /* Remove shadow since background is transparent */
       order: -1; /* Ensure it appears first in flex column */
+      flex-shrink: 1; /* Allow it to shrink on mobile */
     }
     
     .viz3d canvas {
@@ -201,6 +204,7 @@
       color: #fff;
       position: relative;
       overflow: visible; /* allow FX beyond bounds */
+      flex-shrink: 1; /* Allow panel to shrink on mobile */
     }
 
     /* Panel-wide FX overlay so explosions never clip */
@@ -235,6 +239,8 @@
       gap: calc(var(--rowGap) * 1.2);
       position: relative;
       z-index: 2;
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
     .row {
@@ -358,11 +364,58 @@
 
 
     @media (max-width: 520px){
-      .panel{
-        padding: 18px 16px 16px;
-        border-radius: 18px;
+      .stage {
+        padding: 12px 12px 12px;
+        gap: 12px;
+        min-height: 100vh;
+        height: 100vh;
+        justify-content: flex-start;
+        padding-top: max(12px, env(safe-area-inset-top));
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
       }
-      .controls{ padding-top: 14px; }
+      
+      .viz3d {
+        width: 100%;
+        max-width: 100%;
+        height: min(40vh, 280px);
+        margin: 0 auto;
+        flex-shrink: 0;
+      }
+      
+      .panel {
+        width: 100%;
+        max-width: 100%;
+        padding: 14px 12px 14px;
+        border-radius: 18px;
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .rows {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      
+      .controls {
+        padding-top: 10px;
+        flex-shrink: 0;
+      }
+      
+      :root {
+        --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(30px, 5vw, 50px));
+      }
+    }
+    
+    /* Additional mobile-specific hitbox increase for touch devices */
+    @media (hover: none) and (pointer: coarse) {
+      :root {
+        --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(40px, 6vw, 60px));
+      }
     }
   </style>
 </head>
