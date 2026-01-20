@@ -372,8 +372,8 @@
   <div class="stage">
     <div class="viz3d" id="viz3d">
       <div class="viz3dControls">
-        <button class="viz3dAngleBtn active" data-angle="1">1</button>
-        <button class="viz3dAngleBtn" data-angle="2">2</button>
+        <button class="viz3dAngleBtn" data-angle="1">1</button>
+        <button class="viz3dAngleBtn active" data-angle="2">2</button>
         <button class="viz3dAngleBtn" data-angle="3">3</button>
       </div>
     </div>
@@ -2274,16 +2274,16 @@ setTimeout(() => {
   
   // Define three camera angles (zoomed out by 65%)
   const cameraAngles = {
-    1: { position: { x: 49.5, y: 41.25, z: -49.5 }, target: { x: 0, y: 0, z: 0 } }, // Angled view (flipped to opposite corner)
+    1: { position: { x: 49.5, y: 41.25, z: 49.5 }, target: { x: 0, y: 0, z: 0 } }, // Angled view (right-front corner)
     2: { position: { x: 66, y: 33, z: 0 }, target: { x: 0, y: 0, z: 0 } }, // Side view
-    3: { position: { x: 0, y: 24.75, z: 66 }, target: { x: 0, y: 0, z: 0 } } // Front view
+    3: { position: { x: 0, y: 24.75, z: -66 }, target: { x: 0, y: 0, z: 0 } } // Back view
   };
   
-  let currentAngle = 1;
+  let currentAngle = 2;
   let targetCameraPos = new THREE.Vector3();
   let currentCameraPos = new THREE.Vector3();
   
-  // Initialize camera to angle 1
+  // Initialize camera to angle 2
   function setCameraAngle(angleNum) {
     currentAngle = angleNum;
     const angle = cameraAngles[angleNum];
@@ -2294,10 +2294,10 @@ setTimeout(() => {
     }
   }
   
-  setCameraAngle(1);
-  // Initialize to angle 1 (which is now the angled view)
-  camera.position.set(cameraAngles[1].position.x, cameraAngles[1].position.y, cameraAngles[1].position.z);
-  camera.lookAt(cameraAngles[1].target.x, cameraAngles[1].target.y, cameraAngles[1].target.z);
+  setCameraAngle(2);
+  // Initialize to angle 2 (side view)
+  camera.position.set(cameraAngles[2].position.x, cameraAngles[2].position.y, cameraAngles[2].position.z);
+  camera.lookAt(cameraAngles[2].target.x, cameraAngles[2].target.y, cameraAngles[2].target.z);
   currentCameraPos.copy(camera.position);
   
   const renderer = new THREE.WebGLRenderer({ 
@@ -2405,44 +2405,116 @@ setTimeout(() => {
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   
   // Step 6: Color palette function (purple → red → orange → yellow)
-  function getSpectrogramColor(energy, mixT) {
-    // mixT: 0 = gloom (grayscale), 1 = lit (full color)
+  // Step 3: Split color control - beatWeight controls warm/orange, mixWeight controls purple/pink
+  function getSpectrogramColor(energy, rawMix, vocalBeat) {
     energy = Math.max(0, Math.min(1, energy));
     
-    if (mixT < 0.1) {
-      // Gloom mode: grayscale
-      const gray = energy * 0.3;
+    // Step 3: Independent weights for split control
+    const beatWeight = vocalBeat; // Controls warm/orange/yellow portion (Accent A)
+    const mixWeight = rawMix;     // Controls purple/pink/red portion (Accent B)
+    
+    // Base palette colors (unchanged - these are the target colors at full intensity)
+    let targetR, targetG, targetB;
+    if (energy < 0.33) {
+      // Purple to red (Accent B region - controlled by mixWeight)
+      const t = energy / 0.33;
+      targetR = 0.5 + t * 0.5;
+      targetG = 0.0 + t * 0.0;
+      targetB = 0.5 + t * 0.0;
+    } else if (energy < 0.66) {
+      // Red to orange (transition zone - both weights influence)
+      const t = (energy - 0.33) / 0.33;
+      targetR = 1.0;
+      targetG = 0.0 + t * 0.5;
+      targetB = 0.0;
+    } else {
+      // Orange to yellow/white (Accent A region - controlled by beatWeight)
+      const t = (energy - 0.66) / 0.34;
+      targetR = 1.0;
+      targetG = 0.5 + t * 0.5;
+      targetB = 0.0 + t * 0.3;
+    }
+    
+    // Base gloom level
+    const gray = energy * 0.3;
+    
+    // Step 3: Determine which accent controls this energy level
+    // When one slider is on, its colors take over instead of grey
+    const threshold = 0.15; // Minimum slider value to show colors
+    
+    // Check if only one slider is active
+    const mixOnly = mixWeight > threshold && beatWeight <= threshold;
+    const beatOnly = beatWeight > threshold && mixWeight <= threshold;
+    const bothActive = mixWeight > threshold && beatWeight > threshold;
+    
+    let effectiveWeight = 0;
+    
+    if (bothActive) {
+      // Both sliders active - use region-based blending (original behavior)
+      if (energy < 0.33) {
+        effectiveWeight = mixWeight;
+      } else if (energy < 0.66) {
+        const transition = (energy - 0.33) / 0.33;
+        effectiveWeight = mixWeight * (1 - transition) + beatWeight * transition;
+      } else {
+        effectiveWeight = beatWeight;
+      }
+    } else if (mixOnly) {
+      // Only MIXED slider active - show purple/pink/red colors across entire spectrum
+      effectiveWeight = mixWeight;
+      // Override target colors to show cool colors everywhere
+      if (energy < 0.33) {
+        const t = energy / 0.33;
+        targetR = 0.5 + t * 0.5;
+        targetG = 0.0;
+        targetB = 0.5 + t * 0.0;
+      } else if (energy < 0.66) {
+        const t = (energy - 0.33) / 0.33;
+        targetR = 1.0;
+        targetG = 0.0 + t * 0.2; // Slight orange tint
+        targetB = 0.0;
+      } else {
+        const t = (energy - 0.66) / 0.34;
+        targetR = 1.0 - t * 0.2; // Fade to red
+        targetG = 0.0;
+        targetB = 0.0;
+      }
+    } else if (beatOnly) {
+      // Only BEAT slider active - show orange/yellow colors across entire spectrum
+      effectiveWeight = beatWeight;
+      // Override target colors to show warm colors everywhere
+      if (energy < 0.33) {
+        const t = energy / 0.33;
+        targetR = 0.7 + t * 0.3; // Red to orange
+        targetG = 0.1 + t * 0.2; // Some green
+        targetB = 0.0;
+      } else if (energy < 0.66) {
+        const t = (energy - 0.33) / 0.33;
+        targetR = 1.0;
+        targetG = 0.3 + t * 0.4; // Orange to yellow
+        targetB = 0.0;
+      } else {
+        const t = (energy - 0.66) / 0.34;
+        targetR = 1.0;
+        targetG = 0.7 + t * 0.3; // Yellow to white
+        targetB = 0.0 + t * 0.3;
+      }
+    } else {
+      // Both sliders low - use whichever is higher
+      effectiveWeight = Math.max(mixWeight, beatWeight);
+    }
+    
+    // Apply the effective weight to transition from gloom to full color
+    if (effectiveWeight < 0.05) {
+      // Pure gloom mode (only when both sliders are very low)
       return new THREE.Color(gray, gray, gray);
     }
     
-    // Lit mode: full color spectrum
-    let r, g, b;
-    if (energy < 0.33) {
-      // Purple to red
-      const t = energy / 0.33;
-      r = 0.5 + t * 0.5;
-      g = 0.0 + t * 0.0;
-      b = 0.5 + t * 0.0;
-    } else if (energy < 0.66) {
-      // Red to orange
-      const t = (energy - 0.33) / 0.33;
-      r = 1.0;
-      g = 0.0 + t * 0.5;
-      b = 0.0;
-    } else {
-      // Orange to yellow/white
-      const t = (energy - 0.66) / 0.34;
-      r = 1.0;
-      g = 0.5 + t * 0.5;
-      b = 0.0 + t * 0.3;
-    }
-    
-    // Apply mixT for gradual transition from gloom to lit
-    const litFactor = (mixT - 0.1) / 0.9;
-    const gray = energy * 0.3;
-    r = gray + (r - gray) * litFactor;
-    g = gray + (g - gray) * litFactor;
-    b = gray + (b - gray) * litFactor;
+    // Color application - colors show when slider is active
+    const litFactor = Math.min(1, effectiveWeight / 0.7);
+    const r = gray + (targetR - gray) * litFactor;
+    const g = gray + (targetG - gray) * litFactor;
+    const b = gray + (targetB - gray) * litFactor;
     
     return new THREE.Color(r, g, b);
   }
@@ -2456,6 +2528,9 @@ setTimeout(() => {
     metalness: 0.3,
     roughness: 0.7
   });
+  
+  // Step 5: Store original emissive intensity for glow pulse
+  const originalEmissiveIntensity = 0.5;
   
   const terrain = new THREE.Mesh(geometry, material);
   scene.add(terrain);
@@ -2472,8 +2547,101 @@ setTimeout(() => {
   let sliderImpulse = 0;
   let lastMixAmount = mixAmount();
   
+  // Step 4: Reward effect state
+  let rewardActive = false;
+  let rewardEligible = true;
+  let rewardStartTime = 0;
+  const REWARD_THRESHOLD = 0.98;
+  const REWARD_RESET_THRESHOLD = 0.95;
+  const REWARD_DURATION = 700; // ms
+  
+  // Step 5: Camera zoom state for reward
+  let originalCameraDistance = 0;
+  let rewardCameraZoom = 0;
+  
+  // Step 0: Single source of truth for slider values (normalized 0..1)
+  function getRawMix() {
+    // RAW (0) → MIXED (1)
+    return Math.max(0, Math.min(1, tone));
+  }
+  
+  function getVocalBeat() {
+    // VOCALS (0) → BEAT (1)
+    return Math.max(0, Math.min(1, blend));
+  }
+  
+  // Step 4: Check and trigger reward effect
+  function checkRewardEffect(rawMix, vocalBeat, now) {
+    if (rawMix > REWARD_THRESHOLD && vocalBeat > REWARD_THRESHOLD) {
+      if (rewardEligible && !rewardActive) {
+        // Trigger reward
+        rewardActive = true;
+        rewardEligible = false;
+        rewardStartTime = now;
+        
+        // Step 5: Store original camera distance for zoom effect
+        if (originalCameraDistance === 0) {
+          originalCameraDistance = currentCameraPos.distanceTo(new THREE.Vector3(0, 0, 0));
+        }
+      }
+    } else if (rawMix < REWARD_RESET_THRESHOLD || vocalBeat < REWARD_RESET_THRESHOLD) {
+      // Reset eligibility when sliders drop below reset threshold
+      rewardEligible = true;
+    }
+    
+    // Check if reward duration has elapsed
+    if (rewardActive && (now - rewardStartTime) > REWARD_DURATION) {
+      rewardActive = false;
+      rewardCameraZoom = 0;
+    }
+    
+    return rewardActive;
+  }
+  
+  // Step 5: Apply camera zoom during reward
+  function applyRewardCameraZoom(isRewardActive, now) {
+    if (!isRewardActive) {
+      rewardCameraZoom = 0;
+      return;
+    }
+    
+    const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
+    const zoomDuration = 0.25; // 250ms zoom in/out
+    
+    if (rewardProgress < zoomDuration) {
+      // Zoom in (ease in)
+      const t = rewardProgress / zoomDuration;
+      const easeIn = t * t; // Quadratic ease in
+      rewardCameraZoom = easeIn * 0.12; // Zoom in 12%
+    } else if (rewardProgress < zoomDuration * 2) {
+      // Hold zoomed briefly
+      rewardCameraZoom = 0.12;
+    } else if (rewardProgress < zoomDuration * 3) {
+      // Zoom out (ease out)
+      const t = (rewardProgress - zoomDuration * 2) / zoomDuration;
+      const easeOut = 1 - (1 - t) * (1 - t); // Quadratic ease out
+      rewardCameraZoom = 0.12 * (1 - easeOut);
+    } else {
+      rewardCameraZoom = 0;
+    }
+  }
+  
+  // Step 4: Get reward color (golden/white flash instead of rainbow)
+  function getRewardColor(t) {
+    // t: 0..1 across the sweep
+    // Golden to white flash
+    const intensity = Math.sin(t * Math.PI);
+    const r = 1.0;
+    const g = 0.8 + intensity * 0.2; // 0.8 to 1.0
+    const b = 0.3 + intensity * 0.7; // 0.3 to 1.0
+    return new THREE.Color(r, g, b);
+  }
+  
   function mixAmount() {
-    return Math.max(0, Math.min(1, (tone + blend) * 0.5));
+    // Legacy function for backward compatibility
+    const rawMix = getRawMix();
+    const vocalBeat = getVocalBeat();
+    return Math.max(0, Math.min(1, (rawMix + vocalBeat) * 0.5));
   }
   
   function updateImpulse() {
@@ -2484,6 +2652,26 @@ setTimeout(() => {
   // Step 8: Update terrain with audio data
   function updateTerrain() {
     if (!audio.analyser || !audio.dataArray || !audio.ctx) return;
+    
+    // Get slider values (single source of truth)
+    const rawMix = getRawMix();
+    const vocalBeat = getVocalBeat();
+    const now = performance.now();
+    
+    // Step 4: Check for reward effect
+    const isRewardActive = checkRewardEffect(rawMix, vocalBeat, now);
+    
+    // Step 5: Apply camera zoom during reward
+    applyRewardCameraZoom(isRewardActive, now);
+    
+    // Step 5: Apply glow pulse to material during reward
+    if (isRewardActive) {
+      const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
+      const pulse = Math.sin(rewardProgress * Math.PI * 4) * 0.3 + 0.7; // Pulse 0.4 to 1.0, 4 cycles
+      material.emissiveIntensity = originalEmissiveIntensity * (1 + pulse * 0.4); // Boost up to 40%
+    } else {
+      material.emissiveIntensity = originalEmissiveIntensity;
+    }
     
     // Get fresh frequency data
     audio.analyser.getByteFrequencyData(audio.dataArray);
@@ -2510,8 +2698,13 @@ setTimeout(() => {
     // Update geometry positions and colors
     const positions = geometry.attributes.position;
     const colors = geometry.attributes.color;
-    const mixT = mixAmount();
-    const brightness = 0.3 + 0.7 * mixT + sliderImpulse * 0.5;
+    const mixT = mixAmount(); // Keep for now, will refactor in next steps
+    
+    // Step 1: Add minimum brightness floor for RAW+VOCALS corner (gloom factor)
+    const gloomFactor = (1 - rawMix) * (1 - vocalBeat);
+    const minLuma = 0.06 + (0.18 - 0.06) * gloomFactor; // Lerp from 0.06 to 0.18 based on gloom
+    const baseBrightness = 0.3 + 0.7 * mixT + sliderImpulse * 0.5;
+    const brightness = Math.max(minLuma, baseBrightness);
     
     for (let z = 0; z < historyLength; z++) {
       const historyIndex = z;
@@ -2521,12 +2714,58 @@ setTimeout(() => {
         const vertexIndex = z * freqBins + x;
         const energy = freqData[x];
         
-        // Update Y position (height)
-        positions.setY(vertexIndex, energy * maxHeight * brightness);
+        // Step 2: Increase displacement amplitude for RAW+VOCALS to show more geometry detail
+        const rawVocalBoost = 0.8 * ((1 - rawMix) * (1 - vocalBeat));
+        const baseAmp = maxHeight * brightness;
+        const amp = baseAmp * (1 + rawVocalBoost);
         
-        // Update color
-        const color = getSpectrogramColor(energy, mixT);
-        colors.setXYZ(vertexIndex, color.r * brightness, color.g * brightness, color.b * brightness);
+        // Update Y position (height) with amplitude boost
+        positions.setY(vertexIndex, energy * amp);
+        
+        // Update color (Step 3: pass rawMix and vocalBeat for split control)
+        let color = getSpectrogramColor(energy, rawMix, vocalBeat);
+        
+        // Step 4: Apply rainbow sweep during reward
+        if (isRewardActive) {
+          const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
+          // Create sweep effect: rainbow moves across the mesh
+          // Use x position to create horizontal sweep
+          const sweepPos = (x / freqBins) + (rewardProgress * 1.2) - 0.1;
+          const sweepT = Math.max(0, Math.min(1, sweepPos));
+          const rainbowColor = getRainbowColor(sweepT);
+          
+          // Blend between normal color and rainbow based on sweep position
+          const sweepIntensity = Math.exp(-Math.pow((sweepPos - 0.5) * 4, 2)); // Gaussian falloff
+          color.r = color.r * (1 - sweepIntensity * 0.7) + rainbowColor.r * sweepIntensity * 0.7;
+          color.g = color.g * (1 - sweepIntensity * 0.7) + rainbowColor.g * sweepIntensity * 0.7;
+          color.b = color.b * (1 - sweepIntensity * 0.7) + rainbowColor.b * sweepIntensity * 0.7;
+        }
+        
+        // Step 1: Apply minimum brightness floor to prevent pure black
+        // Lift dark colors toward dark gray when in gloom mode
+        let finalR = color.r * brightness;
+        let finalG = color.g * brightness;
+        let finalB = color.b * brightness;
+        
+        // Step 4: Add bloom pulse during reward
+        if (isRewardActive) {
+          const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
+          const pulse = Math.sin(rewardProgress * Math.PI * 2) * 0.3 + 0.7; // Pulse 0.4 to 1.0
+          finalR = Math.min(1, finalR * (1 + pulse * 0.2));
+          finalG = Math.min(1, finalG * (1 + pulse * 0.2));
+          finalB = Math.min(1, finalB * (1 + pulse * 0.2));
+        }
+        
+        // If the color is too dark, lift it toward the minimum luma
+        const currentLuma = 0.299 * finalR + 0.587 * finalG + 0.114 * finalB;
+        if (currentLuma < minLuma && gloomFactor > 0.1) {
+          const lift = (minLuma - currentLuma) * gloomFactor;
+          finalR = Math.min(1, finalR + lift);
+          finalG = Math.min(1, finalG + lift);
+          finalB = Math.min(1, finalB + lift);
+        }
+        
+        colors.setXYZ(vertexIndex, finalR, finalG, finalB);
       }
     }
     
@@ -2543,7 +2782,16 @@ setTimeout(() => {
     if (!useOrbitControls) {
       // Smoothly move camera position
       currentCameraPos.lerp(targetCameraPos, 0.05);
-      camera.position.copy(currentCameraPos);
+      
+      // Step 5: Apply reward camera zoom (move camera closer during reward)
+      if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
+        const direction = currentCameraPos.clone().normalize();
+        const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
+        const zoomedPos = direction.multiplyScalar(zoomedDistance);
+        camera.position.copy(zoomedPos);
+      } else {
+        camera.position.copy(currentCameraPos);
+      }
       
       // Always look at the center
       const angle = cameraAngles[currentAngle];
