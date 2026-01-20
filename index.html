@@ -22,7 +22,7 @@
       height: 100%;
       margin: 0;
       padding: 0;
-      background: transparent;
+      background: #000;
       overflow: auto; /* Allow scrolling */
     }
 
@@ -44,7 +44,7 @@
       justify-content: center;
       padding: 40px 16px 40px;
       box-sizing: border-box;
-      background: transparent;
+      background: #000;
       position: relative;
       gap: 20px;
     }
@@ -124,7 +124,7 @@
     .viz3d {
       width: min(920px, 96vw);
       height: 400px;
-      background: #000;
+      background: transparent;
       border-radius: 22px;
       margin: 0 auto 20px auto;
       position: relative;
@@ -142,7 +142,8 @@
     .viz3dControls {
       position: absolute;
       bottom: 16px;
-      right: 16px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       gap: 10px;
       z-index: 10;
@@ -2249,7 +2250,7 @@ setTimeout(() => {
   
   // Step 1: Create Three.js scene, camera, renderer
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
+  scene.background = null; // Transparent background
   
   // Ensure container has dimensions
   const width = Math.max(viz3dContainer.clientWidth, 400);
@@ -2259,9 +2260,9 @@ setTimeout(() => {
   
   // Define three camera angles (zoomed out by 65%)
   const cameraAngles = {
-    1: { position: { x: 0, y: 24.75, z: 66 }, target: { x: 0, y: 0, z: 0 } }, // Front view
+    1: { position: { x: 49.5, y: 41.25, z: -49.5 }, target: { x: 0, y: 0, z: 0 } }, // Angled view (flipped to opposite corner)
     2: { position: { x: 66, y: 33, z: 0 }, target: { x: 0, y: 0, z: 0 } }, // Side view
-    3: { position: { x: 49.5, y: 41.25, z: -49.5 }, target: { x: 0, y: 0, z: 0 } } // Angled view (flipped to opposite corner)
+    3: { position: { x: 0, y: 24.75, z: 66 }, target: { x: 0, y: 0, z: 0 } } // Front view
   };
   
   let currentAngle = 1;
@@ -2280,15 +2281,16 @@ setTimeout(() => {
   }
   
   setCameraAngle(1);
+  // Initialize to angle 1 (which is now the angled view)
   camera.position.set(cameraAngles[1].position.x, cameraAngles[1].position.y, cameraAngles[1].position.z);
   camera.lookAt(cameraAngles[1].target.x, cameraAngles[1].target.y, cameraAngles[1].target.z);
   currentCameraPos.copy(camera.position);
   
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   renderer.setPixelRatio(dpr);
   renderer.setSize(width, height);
-  renderer.setClearColor(0x000000, 1);
+  renderer.setClearColor(0x000000, 0); // Transparent background
   renderer.domElement.style.width = '100%';
   renderer.domElement.style.height = '100%';
   renderer.domElement.style.display = 'block';
