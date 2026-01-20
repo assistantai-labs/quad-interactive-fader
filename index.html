@@ -365,19 +365,20 @@
 
     @media (max-width: 520px){
       .stage {
-        padding: 12px 12px 12px;
-        gap: 12px;
+        padding: 8px 12px 8px;
+        gap: 10px;
         min-height: 100vh;
-        height: 100vh;
+        height: auto;
+        max-height: 100vh;
         justify-content: flex-start;
-        padding-top: max(12px, env(safe-area-inset-top));
-        padding-bottom: max(12px, env(safe-area-inset-bottom));
+        padding-top: max(8px, env(safe-area-inset-top));
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
       }
       
       .viz3d {
         width: 100%;
         max-width: 100%;
-        height: min(40vh, 280px);
+        height: min(35vh, 240px);
         margin: 0 auto;
         flex-shrink: 0;
       }
@@ -385,7 +386,7 @@
       .panel {
         width: 100%;
         max-width: 100%;
-        padding: 14px 12px 14px;
+        padding: 12px 10px 12px;
         border-radius: 18px;
         flex: 1 1 auto;
         min-height: 0;
@@ -398,16 +399,17 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
       }
       
       .controls {
-        padding-top: 10px;
+        padding-top: 8px;
         flex-shrink: 0;
       }
       
       :root {
         --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(30px, 5vw, 50px));
+        --rowGap: clamp(10px, 1.8vw, 14px);
       }
     }
     
@@ -2904,14 +2906,52 @@ setTimeout(() => {
   console.log('3D Spectrogram visualizer initialized');
 }, 100); // Wait 100ms for DOM to be fully ready
 
-// Only prevent scrolling when touching the panel/frame area (not outside)
-document.addEventListener("touchmove", (e) => {
-  // Only prevent scroll if touching the panel area
+// Only prevent scrolling when actively dragging sliders, not when scrolling the page
+let isDraggingSlider = false;
+let touchStartY = 0;
+let touchStartX = 0;
+
+document.addEventListener("touchstart", (e) => {
   const target = e.target;
-  if (firstGestureDone && panelEl && panelEl.contains(target)) {
-    e.preventDefault();
+  // Check if touch started on a slider element
+  if (panelEl && panelEl.contains(target)) {
+    const trackWrap = target.closest('.trackWrap');
+    if (trackWrap) {
+      // Touch started on slider - track initial position
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+      isDraggingSlider = false; // Will be set to true if horizontal movement detected
+    }
   }
-}, { passive:false });
+}, { passive: true });
+
+document.addEventListener("touchmove", (e) => {
+  const target = e.target;
+  
+  // Only prevent scroll if actively dragging a slider horizontally
+  if (firstGestureDone && panelEl && panelEl.contains(target)) {
+    const trackWrap = target.closest('.trackWrap');
+    if (trackWrap && e.touches.length > 0) {
+      const touch = e.touches[0];
+      const deltaY = Math.abs(touch.clientY - touchStartY);
+      const deltaX = Math.abs(touch.clientX - touchStartX);
+      
+      // If horizontal movement is greater than vertical, it's a slider drag
+      if (deltaX > 10 && deltaX > deltaY * 1.5) {
+        isDraggingSlider = true;
+        e.preventDefault();
+      } else if (isDraggingSlider && deltaX > 5) {
+        // Continue preventing scroll while dragging
+        e.preventDefault();
+      }
+      // Otherwise allow page scrolling
+    }
+  }
+}, { passive: false });
+
+document.addEventListener("touchend", () => {
+  isDraggingSlider = false;
+}, { passive: true });
 
 updatePlayButton();
 
