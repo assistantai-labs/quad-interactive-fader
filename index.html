@@ -423,23 +423,28 @@
         margin: 0 8px; /* Visual padding on left and right */
         padding: 12px 10px 16px; /* Restored visual padding: 12px top, 10px sides, 16px bottom */
         border-radius: 16px;
-        flex: 1 1 auto;
-        min-height: 0;
-        max-height: calc(100vh - 28vh - 6px - 8px); /* EXACT: remaining space */
+        height: calc(100vh - 28vh - 6px - 8px); /* EXACT fixed height - does not extend */
+        max-height: calc(100vh - 28vh - 6px - 8px); /* Prevent extension */
+        min-height: calc(100vh - 28vh - 6px - 8px); /* Prevent shrinking */
         display: flex;
         flex-direction: column;
         overflow: hidden !important; /* Prevent panel from overflowing */
         order: 1; /* Force panel below visualizer */
         position: relative;
+        flex-shrink: 0; /* Never shrink */
+        flex-grow: 0; /* Never grow */
+        box-sizing: border-box;
       }
       
       .rows {
-        flex: 1 1 auto;
-        min-height: 0;
+        flex: 0 0 auto; /* Fixed size - do not grow or shrink */
+        min-height: auto;
+        max-height: none;
         display: flex;
         flex-direction: column;
         gap: 3px;
-        overflow: hidden;
+        overflow: visible;
+        flex-shrink: 0;
       }
       
       .controls {
@@ -447,7 +452,9 @@
         padding-bottom: 0;
         margin-bottom: 0;
         flex-shrink: 0;
+        flex-grow: 0;
         position: relative;
+        margin-top: 0; /* No auto margin - fixed position */
       }
       
       :root {
