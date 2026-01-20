@@ -21,7 +21,7 @@
       margin: 0;
       padding: 0;
       background: transparent;
-      overscroll-behavior: none;
+      overflow: auto; /* Allow scrolling */
     }
 
     body {
@@ -31,7 +31,7 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
-      touch-action: none;
+      touch-action: auto; /* Allow scrolling on body */
     }
 
     .stage {
@@ -295,13 +295,6 @@
 <body>
   <div class="rewardWave" id="rewardWave"></div>
   <div class="stage">
-    <a href="https://www.quad808.com/quad" target="_blank" class="profileBadge" id="profileBadge">
-      <img class="profileAvatar" id="profileAvatar" src="assets/IMG_7485.jpeg" alt="" onerror="this.onerror=null; this.parentElement.style.display='none'">
-      <div class="profileLabel">
-        <span class="profileLabelLine">MIXED BY</span><br>
-        <span class="profileLabelLine">QUAD808</span>
-      </div>
-    </a>
     <div class="panel" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
 
@@ -2148,9 +2141,13 @@ function completionBurstLoop() {
 }
 requestAnimationFrame(completionBurstLoop);
 
+// Only prevent scrolling when touching the panel/frame area (not outside)
 document.addEventListener("touchmove", (e) => {
-  // prevent page scroll inside embed while interacting
-  if (firstGestureDone) e.preventDefault();
+  // Only prevent scroll if touching the panel area
+  const target = e.target;
+  if (firstGestureDone && panelEl && panelEl.contains(target)) {
+    e.preventDefault();
+  }
 }, { passive:false });
 
 updatePlayButton();
