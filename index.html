@@ -418,9 +418,10 @@
       }
       
       .panel {
-        width: 100%;
-        max-width: 100%;
-        padding: 8px 6px 16px; /* Fixed 16px bottom padding for permanent distance from play button */
+        width: calc(100% - 16px); /* Add visual padding by reducing width */
+        max-width: calc(100% - 16px);
+        margin: 0 8px; /* Visual padding on left and right */
+        padding: 12px 10px 16px; /* Restored visual padding: 12px top, 10px sides, 16px bottom */
         border-radius: 16px;
         flex: 1 1 auto;
         min-height: 0;
