@@ -1822,8 +1822,8 @@ function makeSlider(opts){
   }
 
   function animate(){
-    // 20% less drag (more responsive): increase follow factor
-    const follow = isDown ? 0.316 : 0.259;
+    // Half drag (much more responsive): increase follow factor significantly
+    const follow = isDown ? 0.6 : 0.5;
     const prevDisplay = display;
     display = display + (target - display) * follow;
 
