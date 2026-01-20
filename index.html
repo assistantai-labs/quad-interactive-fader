@@ -2404,117 +2404,127 @@ setTimeout(() => {
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   
-  // Step 6: Color palette function (purple → red → orange → yellow)
-  // Step 3: Split color control - beatWeight controls warm/orange, mixWeight controls purple/pink
+  // Step 6: Color palette function with smooth fading between states
+  // RAW + VOCALS (both low) = Grey
+  // BEAT only (RAW + BEAT) = Orange and Yellow
+  // MIXED + VOCALS = Pink and Purple
+  // MIXED + BEAT (both high) = First version colors (purple → red → orange → yellow)
   function getSpectrogramColor(energy, rawMix, vocalBeat) {
     energy = Math.max(0, Math.min(1, energy));
-    
-    // Step 3: Independent weights for split control
-    const beatWeight = vocalBeat; // Controls warm/orange/yellow portion (Accent A)
-    const mixWeight = rawMix;     // Controls purple/pink/red portion (Accent B)
-    
-    // Base palette colors (unchanged - these are the target colors at full intensity)
-    let targetR, targetG, targetB;
-    if (energy < 0.33) {
-      // Purple to red (Accent B region - controlled by mixWeight)
-      const t = energy / 0.33;
-      targetR = 0.5 + t * 0.5;
-      targetG = 0.0 + t * 0.0;
-      targetB = 0.5 + t * 0.0;
-    } else if (energy < 0.66) {
-      // Red to orange (transition zone - both weights influence)
-      const t = (energy - 0.33) / 0.33;
-      targetR = 1.0;
-      targetG = 0.0 + t * 0.5;
-      targetB = 0.0;
-    } else {
-      // Orange to yellow/white (Accent A region - controlled by beatWeight)
-      const t = (energy - 0.66) / 0.34;
-      targetR = 1.0;
-      targetG = 0.5 + t * 0.5;
-      targetB = 0.0 + t * 0.3;
-    }
     
     // Base gloom level
     const gray = energy * 0.3;
     
-    // Step 3: Determine which accent controls this energy level
-    // When one slider is on, its colors take over instead of grey
-    const threshold = 0.15; // Minimum slider value to show colors
-    
-    // Check if only one slider is active
-    const mixOnly = mixWeight > threshold && beatWeight <= threshold;
-    const beatOnly = beatWeight > threshold && mixWeight <= threshold;
-    const bothActive = mixWeight > threshold && beatWeight > threshold;
-    
-    let effectiveWeight = 0;
-    
-    if (bothActive) {
-      // Both sliders active - use region-based blending (original behavior)
-      if (energy < 0.33) {
-        effectiveWeight = mixWeight;
-      } else if (energy < 0.66) {
-        const transition = (energy - 0.33) / 0.33;
-        effectiveWeight = mixWeight * (1 - transition) + beatWeight * transition;
-      } else {
-        effectiveWeight = beatWeight;
+    // Helper function to get color for a specific state
+    function getStateColor(state, e) {
+      let r = 0, g = 0, b = 0;
+      
+      if (state === 'rawVocals') {
+        // RAW + VOCALS = Grey
+        return { r: gray, g: gray, b: gray };
+      } else if (state === 'rawBeat') {
+        // RAW + BEAT = Orange and Yellow
+        if (e < 0.5) {
+          const t = e / 0.5;
+          r = 0.8 + t * 0.2;
+          g = 0.3 + t * 0.3;
+          b = 0.0;
+        } else {
+          const t = (e - 0.5) / 0.5;
+          r = 1.0;
+          g = 0.6 + t * 0.4;
+          b = 0.0 + t * 0.2;
+        }
+      } else if (state === 'mixedVocals') {
+        // MIXED + VOCALS = Pink and Purple
+        if (e < 0.33) {
+          const t = e / 0.33;
+          r = 0.5 + t * 0.2;
+          g = 0.0;
+          b = 0.5 + t * 0.3;
+        } else if (e < 0.66) {
+          const t = (e - 0.33) / 0.33;
+          r = 0.7 + t * 0.3;
+          g = 0.0 + t * 0.2;
+          b = 0.8 - t * 0.4;
+        } else {
+          const t = (e - 0.66) / 0.34;
+          r = 1.0;
+          g = 0.2 + t * 0.3;
+          b = 0.4 - t * 0.2;
+        }
+      } else if (state === 'mixedBeat') {
+        // MIXED + BEAT = First version colors
+        if (e < 0.33) {
+          const t = e / 0.33;
+          r = 0.5 + t * 0.5;
+          g = 0.0 + t * 0.0;
+          b = 0.5 + t * 0.0;
+        } else if (e < 0.66) {
+          const t = (e - 0.33) / 0.33;
+          r = 1.0;
+          g = 0.0 + t * 0.5;
+          b = 0.0;
+        } else {
+          const t = (e - 0.66) / 0.34;
+          r = 1.0;
+          g = 0.5 + t * 0.5;
+          b = 0.0 + t * 0.3;
+        }
       }
-    } else if (mixOnly) {
-      // Only MIXED slider active - show purple/pink/red colors across entire spectrum
-      effectiveWeight = mixWeight;
-      // Override target colors to show cool colors everywhere
-      if (energy < 0.33) {
-        const t = energy / 0.33;
-        targetR = 0.5 + t * 0.5;
-        targetG = 0.0;
-        targetB = 0.5 + t * 0.0;
-      } else if (energy < 0.66) {
-        const t = (energy - 0.33) / 0.33;
-        targetR = 1.0;
-        targetG = 0.0 + t * 0.2; // Slight orange tint
-        targetB = 0.0;
-      } else {
-        const t = (energy - 0.66) / 0.34;
-        targetR = 1.0 - t * 0.2; // Fade to red
-        targetG = 0.0;
-        targetB = 0.0;
-      }
-    } else if (beatOnly) {
-      // Only BEAT slider active - show orange/yellow colors across entire spectrum
-      effectiveWeight = beatWeight;
-      // Override target colors to show warm colors everywhere
-      if (energy < 0.33) {
-        const t = energy / 0.33;
-        targetR = 0.7 + t * 0.3; // Red to orange
-        targetG = 0.1 + t * 0.2; // Some green
-        targetB = 0.0;
-      } else if (energy < 0.66) {
-        const t = (energy - 0.33) / 0.33;
-        targetR = 1.0;
-        targetG = 0.3 + t * 0.4; // Orange to yellow
-        targetB = 0.0;
-      } else {
-        const t = (energy - 0.66) / 0.34;
-        targetR = 1.0;
-        targetG = 0.7 + t * 0.3; // Yellow to white
-        targetB = 0.0 + t * 0.3;
-      }
-    } else {
-      // Both sliders low - use whichever is higher
-      effectiveWeight = Math.max(mixWeight, beatWeight);
+      return { r, g, b };
     }
     
-    // Apply the effective weight to transition from gloom to full color
+    // Calculate blend factors for smooth transitions
+    // rawMix: 0 = RAW, 1 = MIXED
+    // vocalBeat: 0 = VOCALS, 1 = BEAT
+    
+    // Interpolate between RAW and MIXED
+    const rawFactor = 1 - rawMix;
+    const mixedFactor = rawMix;
+    
+    // Interpolate between VOCALS and BEAT
+    const vocalsFactor = 1 - vocalBeat;
+    const beatFactor = vocalBeat;
+    
+    // Get colors for all four corner states
+    const rawVocalsColor = getStateColor('rawVocals', energy);
+    const rawBeatColor = getStateColor('rawBeat', energy);
+    const mixedVocalsColor = getStateColor('mixedVocals', energy);
+    const mixedBeatColor = getStateColor('mixedBeat', energy);
+    
+    // First blend along the RAW→MIXED axis
+    const vocalsBlend = {
+      r: rawVocalsColor.r * rawFactor + mixedVocalsColor.r * mixedFactor,
+      g: rawVocalsColor.g * rawFactor + mixedVocalsColor.g * mixedFactor,
+      b: rawVocalsColor.b * rawFactor + mixedVocalsColor.b * mixedFactor
+    };
+    
+    const beatBlend = {
+      r: rawBeatColor.r * rawFactor + mixedBeatColor.r * mixedFactor,
+      g: rawBeatColor.g * rawFactor + mixedBeatColor.g * mixedFactor,
+      b: rawBeatColor.b * rawFactor + mixedBeatColor.b * mixedFactor
+    };
+    
+    // Then blend along the VOCALS→BEAT axis
+    const finalColor = {
+      r: vocalsBlend.r * vocalsFactor + beatBlend.r * beatFactor,
+      g: vocalsBlend.g * vocalsFactor + beatBlend.g * beatFactor,
+      b: vocalsBlend.b * vocalsFactor + beatBlend.b * beatFactor
+    };
+    
+    // Apply intensity based on overall slider activity
+    const effectiveWeight = Math.max(rawMix, vocalBeat);
+    
     if (effectiveWeight < 0.05) {
-      // Pure gloom mode (only when both sliders are very low)
       return new THREE.Color(gray, gray, gray);
     }
     
-    // Color application - colors show when slider is active
-    const litFactor = Math.min(1, effectiveWeight / 0.7);
-    const r = gray + (targetR - gray) * litFactor;
-    const g = gray + (targetG - gray) * litFactor;
-    const b = gray + (targetB - gray) * litFactor;
+    // Smooth color application
+    const litFactor = Math.min(1, effectiveWeight / 0.5);
+    const r = gray + (finalColor.r - gray) * litFactor;
+    const g = gray + (finalColor.g - gray) * litFactor;
+    const b = gray + (finalColor.b - gray) * litFactor;
     
     return new THREE.Color(r, g, b);
   }
@@ -2725,20 +2735,20 @@ setTimeout(() => {
         // Update color (Step 3: pass rawMix and vocalBeat for split control)
         let color = getSpectrogramColor(energy, rawMix, vocalBeat);
         
-        // Step 4: Apply rainbow sweep during reward
+        // Step 4: Apply golden/white flash sweep during reward (no rainbow)
         if (isRewardActive) {
           const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
-          // Create sweep effect: rainbow moves across the mesh
+          // Create sweep effect: golden flash moves across the mesh
           // Use x position to create horizontal sweep
           const sweepPos = (x / freqBins) + (rewardProgress * 1.2) - 0.1;
           const sweepT = Math.max(0, Math.min(1, sweepPos));
-          const rainbowColor = getRainbowColor(sweepT);
+          const rewardColor = getRewardColor(sweepT);
           
-          // Blend between normal color and rainbow based on sweep position
+          // Blend between normal color and golden flash based on sweep position
           const sweepIntensity = Math.exp(-Math.pow((sweepPos - 0.5) * 4, 2)); // Gaussian falloff
-          color.r = color.r * (1 - sweepIntensity * 0.7) + rainbowColor.r * sweepIntensity * 0.7;
-          color.g = color.g * (1 - sweepIntensity * 0.7) + rainbowColor.g * sweepIntensity * 0.7;
-          color.b = color.b * (1 - sweepIntensity * 0.7) + rainbowColor.b * sweepIntensity * 0.7;
+          color.r = color.r * (1 - sweepIntensity * 0.6) + rewardColor.r * sweepIntensity * 0.6;
+          color.g = color.g * (1 - sweepIntensity * 0.6) + rewardColor.g * sweepIntensity * 0.6;
+          color.b = color.b * (1 - sweepIntensity * 0.6) + rewardColor.b * sweepIntensity * 0.6;
         }
         
         // Step 1: Apply minimum brightness floor to prevent pure black
