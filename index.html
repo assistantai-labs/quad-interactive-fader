@@ -64,8 +64,8 @@
     }
     
     .profileAvatar {
-      width: clamp(108px, 14.625vw, 144px);
-      height: clamp(108px, 14.625vw, 144px);
+      width: clamp(72px, 9.75vw, 96px); /* 2/3 of original size */
+      height: clamp(72px, 9.75vw, 96px); /* 2/3 of original size */
       border-radius: 50%;
       background: rgba(255,255,255,0.1);
       border: 2px solid rgba(255,255,255,0.15);
@@ -80,30 +80,30 @@
       -webkit-backdrop-filter: blur(8px);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 999px;
-      padding: 3px 9px;
+      padding: 2px 6px; /* 2/3 of original padding */
       letter-spacing: 0.15em;
       text-transform: uppercase;
       text-align: center;
       color: rgba(255,255,255,0.9);
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       white-space: nowrap;
-      margin-top: -15px;
+      margin-top: -10px; /* 2/3 of original margin */
       position: relative;
       z-index: 11;
     }
     
     .profileLabelLine {
       display: block;
-      line-height: 0.5;
+      line-height: 0.3;
     }
     
     .profileLabelLine:first-child {
-      font-size: clamp(6.75px, 0.825vw, 8.25px);
-      margin-bottom: -6px;
+      font-size: clamp(4.5px, 0.55vw, 5.5px); /* 2/3 of original size */
+      margin-bottom: -8px; /* Much tighter spacing */
     }
     
     .profileLabelLine:last-child {
-      font-size: clamp(10.5px, 1.35vw, 13.5px);
+      font-size: clamp(7px, 0.9vw, 9px); /* 2/3 of original size */
     }
 
     .panel {
@@ -554,8 +554,8 @@ function makePanelFx(canvas, panelEl) {
   ro.observe(panelEl);
   resize();
 
-  function extravagantBurst(x, y, strength=1, trackWidth=null, pullDistance=null) {
-    const n = Math.floor(30 + 50 * strength);
+  function extravagantBurst(x, y, strength=1, trackWidth=null, pullDistance=null, knob=null) {
+    const n = Math.floor(10 + 15 * strength); // Way fewer particles
     const parts = fx.burst?.parts || [];
     
     // Calculate slider speed during slingshot to match exactly
@@ -601,8 +601,8 @@ function makePanelFx(canvas, panelEl) {
     for (let i=0;i<n;i++){
       // Explode in all directions like a firework
       const angle = Math.random() * Math.PI * 2;
-      // Use slingshot speed as base, with some variation
-      const speed = slingshotSpeedPerFrame * (0.8 + Math.random() * 0.4);
+      // Use slingshot speed as base, with more variation for greater dispersion
+      const speed = slingshotSpeedPerFrame * (1.5 + Math.random() * 1.5); // Much faster initial speed
       
       parts.push({
         x: x,
@@ -610,10 +610,14 @@ function makePanelFx(canvas, panelEl) {
         vx: Math.cos(angle) * speed, // Speed based on pull distance
         vy: Math.sin(angle) * speed, // Speed based on pull distance
         life: 1,
-        size: 2 + Math.random() * 2.5, // A little smaller
+        size: 1 + Math.random() * 1.5, // Smaller balls
         hue: 0, // Will be calculated dynamically
         settled: false,
-        createdAt: performance.now() // Track when particle was created
+        createdAt: performance.now(), // Track when particle was created
+        knob: knob, // Store reference to source slider knob
+        explosionX: x, // Store explosion position (where knob was when it exploded)
+        explosionY: y, // Store explosion position (where knob was when it exploded)
+        orbitPhase: Math.random() * Math.PI * 2 // Random phase offset for staggered orbiting
       });
     }
     fx.burst = { parts };
@@ -849,8 +853,91 @@ function makePanelFx(canvas, panelEl) {
           }
         }
         
-        // No gravity - particles move freely
-        pt.vx *= 0.995; // Friction for slower movement
+        // First explode outward, then slowly circle back to knob
+        let merged = false;
+        if (pt.explosionX !== undefined && pt.explosionY !== undefined) {
+          // Use the stored explosion position (where the knob was when it exploded)
+          const targetX = pt.explosionX;
+          const targetY = pt.explosionY;
+          
+          // Calculate distance and direction to explosion position
+          const dx = pt.x - targetX;
+          const dy = pt.y - targetY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          // Calculate particle age
+          const age = (performance.now() - pt.createdAt) / 1000; // Age in seconds
+          const explosionPhase = 0.3; // Time for initial explosion (0.3 seconds)
+          const orbitStartPhase = 1.5; // When to start orbiting back (1.5 seconds - longer float time)
+          
+          // Merge threshold: when particle gets very close to explosion position, it merges back
+          const mergeRadius = 15; // Distance at which particle merges back into knob
+          const orbitRadius = 40; // Preferred orbit radius
+          
+          // Phase 1: Explosion - let particles fly outward naturally
+          if (age < explosionPhase) {
+            // Just let them explode - no orbital motion yet
+            // Particles will naturally move outward from initial velocity
+          }
+          // Phase 2: Start pulling back and orbiting
+          else if (age >= orbitStartPhase) {
+            // Check if particle has moved away from spawn point
+            const spawnDist = Math.sqrt((pt.x - pt.explosionX) ** 2 + (pt.y - pt.explosionY) ** 2);
+            const hasMovedAway = spawnDist > mergeRadius * 2;
+            
+            if (hasMovedAway && dist < mergeRadius) {
+              // Particle has moved away and come back close enough to merge - mark for removal
+              merged = true;
+              pt.merged = true; // Mark as merged so it's removed
+            } else if (dist > mergeRadius && dist > 0.1) {
+              // Create very slow orbital motion around the knob with staggered phases
+              const orbitalSpeed = 0.05; // Very slow orbital speed (radians per second)
+              
+              // Calculate current angle from center
+              const currentAngle = Math.atan2(dy, dx);
+              
+              // Use orbit phase offset for staggering (default to 0 if not set)
+              const phaseOffset = pt.orbitPhase || 0;
+              
+              // Calculate desired orbital velocity (tangential to circle)
+              // Perpendicular to radius vector: rotate by 90 degrees, add phase offset
+              const tangentAngle = currentAngle + Math.PI / 2 + phaseOffset;
+              
+              // Orbital velocity magnitude - constant speed for smooth orbit
+              const orbitalVelocity = orbitalSpeed * dt * 60;
+              
+              // Apply orbital velocity (tangential) - normalized by distance to maintain constant angular velocity
+              const angularVelocity = orbitalVelocity / Math.max(dist, 1); // Prevent division by zero
+              pt.vx += Math.cos(tangentAngle) * angularVelocity * dist;
+              pt.vy += Math.sin(tangentAngle) * angularVelocity * dist;
+              
+              // Apply stronger pull toward orbit radius
+              const pullStrength = 0.15; // Stronger magnetic pull toward knob
+              const distFromOrbit = dist - orbitRadius;
+              const pullForce = pullStrength * distFromOrbit * dt * 60;
+              if (dist > 0) {
+                pt.vx -= (dx / dist) * pullForce;
+                pt.vy -= (dy / dist) * pullForce;
+              }
+            }
+          }
+          // Phase 2.5: Transition phase - start gentle pull
+          else {
+            // Stronger pull toward center to start bringing them back
+            const pullStrength = 0.1; // Stronger magnetic pull
+            if (dist > orbitRadius && dist > 0.1) {
+              pt.vx -= (dx / dist) * pullStrength * dt * 60;
+              pt.vy -= (dy / dist) * pullStrength * dt * 60;
+            }
+          }
+        }
+        
+        // Skip processing if merged
+        if (merged) {
+          continue;
+        }
+        
+        pt.vx *= 0.98; // More friction for much slower movement
         
         // Update position
         pt.x += pt.vx;
@@ -918,100 +1005,118 @@ function makePanelFx(canvas, panelEl) {
         const r = borderRadius;
         const margin = pt.size + 1.5; // Increased margin to keep particles further inside
         
-        // Check if particle is outside bounds and push it back in
+        // Check if particle is outside bounds and push it back in with bounce
         if (!isInsideRoundedRect(pt.x, pt.y, pt.size)) {
-          // Push particle back inside with low bounce response
-          if (relX < margin) {
-            pt.x = canvasOffset + margin;
-            pt.vx *= -0.3; // Way less bouncy
-          } else if (relX > panelW - margin) {
-            pt.x = canvasOffset + panelW - margin;
-            pt.vx *= -0.3; // Way less bouncy
-          }
+          const isInTopLeftCorner = relX < r && relY < r;
+          const isInTopRightCorner = relX > panelW - r && relY < r;
+          const isInBottomLeftCorner = relX < r && relY > panelH - r;
+          const isInBottomRightCorner = relX > panelW - r && relY > panelH - r;
           
-          if (relY < margin) {
-            pt.y = canvasOffset + margin;
-            pt.vy *= -0.3; // Way less bouncy
-          } else if (relY > panelH - margin) {
-            // Handle bottom edge and corners
-            const isInLeftCorner = relX < r;
-            const isInRightCorner = relX > panelW - r;
-            
-            if (isInLeftCorner) {
-              // Bottom-left corner - constrain to curve
-              const cornerX = canvasOffset + r;
-              const cornerY = canvasOffset + panelH - r;
-              const dx = pt.x - cornerX;
-              const dy = pt.y - cornerY;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              const maxDist = r - margin;
-              if (dist > maxDist) {
-                const angle = Math.atan2(dy, dx);
-                pt.x = cornerX + Math.cos(angle) * maxDist;
-                pt.y = cornerY + Math.sin(angle) * maxDist;
-                // Bounce off corner curve - way less bouncy
-                const normalAngle = angle + Math.PI;
-                const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
-                pt.vx = Math.cos(normalAngle) * bounceSpeed;
-                pt.vy = Math.sin(normalAngle) * bounceSpeed;
-              }
-            } else if (isInRightCorner) {
-              // Bottom-right corner - constrain to curve
-              const cornerX = canvasOffset + panelW - r;
-              const cornerY = canvasOffset + panelH - r;
-              const dx = pt.x - cornerX;
-              const dy = pt.y - cornerY;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              const maxDist = r - margin;
-              if (dist > maxDist) {
-                const angle = Math.atan2(dy, dx);
-                pt.x = cornerX + Math.cos(angle) * maxDist;
-                pt.y = cornerY + Math.sin(angle) * maxDist;
-                // Bounce off corner curve - way less bouncy
-                const normalAngle = angle + Math.PI;
-                const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
-                pt.vx = Math.cos(normalAngle) * bounceSpeed;
-                pt.vy = Math.sin(normalAngle) * bounceSpeed;
-              }
-            } else {
-              // Flat bottom edge
-              pt.y = canvasOffset + panelH - margin;
+          // Handle corners first
+          if (isInTopLeftCorner) {
+            // Top-left corner - bounce off curve
+            const cornerX = canvasOffset + r;
+            const cornerY = canvasOffset + r;
+            const dx = pt.x - cornerX;
+            const dy = pt.y - cornerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = r - margin;
+            if (dist > maxDist) {
+              const angle = Math.atan2(dy, dx);
+              pt.x = cornerX + Math.cos(angle) * maxDist;
+              pt.y = cornerY + Math.sin(angle) * maxDist;
+              // Bounce off corner curve
+              const normalAngle = angle + Math.PI;
+              const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
+              pt.vx = Math.cos(normalAngle) * bounceSpeed;
+              pt.vy = Math.sin(normalAngle) * bounceSpeed;
             }
-          }
-        }
-        
-        // Check if hit bottom - make floor bouncy for all particles
-        if (pt.y >= bottomY - pt.size) {
-          const isInLeftCorner = relX < r;
-          const isInRightCorner = relX > panelW - r;
-          
-          pt.y = bottomY - pt.size;
-          
-          // Way less bouncy - low bounce coefficient
-          const bounceMultiplier = 0.3 + (audioIntensity * 0.1); // 0.3 to 0.4 (way less bouncy)
-          if (Math.abs(pt.vy) > 0.01) {
-            pt.vy *= -bounceMultiplier; // Way less bouncy (no upward boost from audio)
-            pt.vx *= 0.99; // Minimal horizontal friction
-            pt.settled = false; // Never settle while bouncing
+          } else if (isInTopRightCorner) {
+            // Top-right corner - bounce off curve
+            const cornerX = canvasOffset + panelW - r;
+            const cornerY = canvasOffset + r;
+            const dx = pt.x - cornerX;
+            const dy = pt.y - cornerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = r - margin;
+            if (dist > maxDist) {
+              const angle = Math.atan2(dy, dx);
+              pt.x = cornerX + Math.cos(angle) * maxDist;
+              pt.y = cornerY + Math.sin(angle) * maxDist;
+              // Bounce off corner curve
+              const normalAngle = angle + Math.PI;
+              const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
+              pt.vx = Math.cos(normalAngle) * bounceSpeed;
+              pt.vy = Math.sin(normalAngle) * bounceSpeed;
+            }
+          } else if (isInBottomLeftCorner) {
+            // Bottom-left corner - bounce off curve
+            const cornerX = canvasOffset + r;
+            const cornerY = canvasOffset + panelH - r;
+            const dx = pt.x - cornerX;
+            const dy = pt.y - cornerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = r - margin;
+            if (dist > maxDist) {
+              const angle = Math.atan2(dy, dx);
+              pt.x = cornerX + Math.cos(angle) * maxDist;
+              pt.y = cornerY + Math.sin(angle) * maxDist;
+              // Bounce off corner curve
+              const normalAngle = angle + Math.PI;
+              const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
+              pt.vx = Math.cos(normalAngle) * bounceSpeed;
+              pt.vy = Math.sin(normalAngle) * bounceSpeed;
+            }
+          } else if (isInBottomRightCorner) {
+            // Bottom-right corner - bounce off curve
+            const cornerX = canvasOffset + panelW - r;
+            const cornerY = canvasOffset + panelH - r;
+            const dx = pt.x - cornerX;
+            const dy = pt.y - cornerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = r - margin;
+            if (dist > maxDist) {
+              const angle = Math.atan2(dy, dx);
+              pt.x = cornerX + Math.cos(angle) * maxDist;
+              pt.y = cornerY + Math.sin(angle) * maxDist;
+              // Bounce off corner curve
+              const normalAngle = angle + Math.PI;
+              const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
+              pt.vx = Math.cos(normalAngle) * bounceSpeed;
+              pt.vy = Math.sin(normalAngle) * bounceSpeed;
+            }
           } else {
-            // Only settle if velocity is extremely low (almost stopped) and audio is quiet
-            if (audioIntensity < 0.05) {
-              pt.vy = 0;
-              pt.vx = 0;
-              pt.settled = true;
-            } else {
-              // Audio is playing, keep it slightly bouncy
-              pt.vy *= -0.3;
-              pt.settled = false;
+            // Handle flat edges - bounce off all sides
+            if (relX < margin) {
+              // Left edge
+              pt.x = canvasOffset + margin;
+              pt.vx *= -0.3; // Bounce off left
+            } else if (relX > panelW - margin) {
+              // Right edge
+              pt.x = canvasOffset + panelW - margin;
+              pt.vx *= -0.3; // Bounce off right
+            }
+            
+            if (relY < margin) {
+              // Top edge
+              pt.y = canvasOffset + margin;
+              pt.vy *= -0.3; // Bounce off top
+            } else if (relY > panelH - margin) {
+              // Bottom edge
+              pt.y = canvasOffset + panelH - margin;
+              pt.vy *= -0.3; // Bounce off bottom
             }
           }
         }
         
-        // Calculate age and fade out after 2 seconds
+        // Bounce off all edges - this is now handled in the constraint check above
+        // Removed duplicate bottom check to avoid conflicts
+        
+        // Calculate fade-out after 4 seconds
         const age = (performance.now() - pt.createdAt) / 1000; // Age in seconds
-        const fadeStartTime = 2; // Start fading after 2 seconds
-        const fadeDuration = 2; // Fade out over 2 seconds (much slower fade)
-        let fadeAlpha = 1;
+        const fadeStartTime = 4.0; // Start fading after 4 seconds
+        const fadeDuration = 1.0; // Fade out over 1 second
+        let fadeAlpha = 1.0;
         
         if (age > fadeStartTime) {
           // Fade out over fadeDuration seconds
@@ -1023,7 +1128,7 @@ function makePanelFx(canvas, panelEl) {
         const particleHue = 0; // Hue doesn't matter for white
         const particleSaturation = 0; // White has no saturation
         const particleLightness = 100; // White is maximum lightness
-        let particleAlpha = 1.0; // Solid (fully opaque)
+        let particleAlpha = 1.0; // Fully opaque
         
         // Apply fade-out alpha
         particleAlpha *= fadeAlpha;
@@ -1040,12 +1145,46 @@ function makePanelFx(canvas, panelEl) {
       }
       ctx.restore();
       
-      // Remove particles that have faded out (older than 4 seconds)
+      // Track merge progress for knob fade-in synchronization
+      const knobsWithParticles = new Map(); // Map of knob -> {total, merged, close}
+      
+      // First pass: count particles per knob
+      for (const p of parts) {
+        if (p.knob) {
+          if (!knobsWithParticles.has(p.knob)) {
+            knobsWithParticles.set(p.knob, { total: 0, merged: 0, close: 0 });
+          }
+          const stats = knobsWithParticles.get(p.knob);
+          stats.total++;
+          
+          if (p.merged) {
+            stats.merged++;
+          } else {
+            // Check if particle is close to merging - use explosion position
+            if (p.explosionX !== undefined && p.explosionY !== undefined) {
+              const dx = p.explosionX - p.x;
+              const dy = p.explosionY - p.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              const mergeRadius = 15;
+              const closeThreshold = mergeRadius * 3; // Consider "close" when within 3x merge radius
+              if (dist < closeThreshold) {
+                stats.close++;
+              }
+            }
+          }
+        }
+      }
+      
+      // Remove particles that have merged back into knob or faded out (after 5 seconds total)
       const now = performance.now();
       fx.burst.parts = parts.filter(p => {
+        if (p.merged) return false; // Remove merged particles
         const age = (now - p.createdAt) / 1000;
-        return age < 4; // Remove after 4 seconds (2s visible + 2s fade)
+        return age < 5; // Remove after 5 seconds (4s visible + 1s fade)
       });
+      
+      // Knob fade-in is now handled independently by setTimeout in the slider code
+      // No particle-based fade-in logic needed here
       
       // Limit total particles to prevent memory issues
       if (fx.burst.parts.length > 2000) {
@@ -1176,6 +1315,11 @@ function makeSlider(opts){
   }
 
   function setKnobFromDisplay(){
+    // Don't update position if knob is hidden
+    if (knobHidden || knob.style.display === "none") {
+      return;
+    }
+    
     const { r, pl, w } = trackRect();
 
     // Calculate overscroll for morphing - based on how far display goes beyond 0-1
@@ -1239,6 +1383,11 @@ function makeSlider(opts){
   }
   
   function applyMorphTransform() {
+    // Don't apply transforms if knob is hidden
+    if (knobHidden || knob.style.display === "none") {
+      return;
+    }
+    
     const isPressed = knob.classList.contains("isDown");
     const baseScale = isPressed ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--knobPress')) || 1.4 : 1;
     
@@ -1384,23 +1533,41 @@ function makeSlider(opts){
         display = dest;
         setKnobFromDisplay(); // Set position first
         
-        // Hide knob and create explosion effect when it hits the wall
+        // Hide knob completely and create explosion effect when it hits the wall
         if (!exploded) {
           exploded = true;
           explosionTime = now;
           knobHidden = true;
-          knob.style.opacity = "0";
-          knob.style.transition = "opacity 30ms linear";
           
-          // Get knob position for explosion (at the wall)
+          // Get knob position for explosion BEFORE hiding (at the wall)
           const knobRect = knob.getBoundingClientRect();
           const panelRect = panelEl.getBoundingClientRect();
           const explosionX = (knobRect.left - panelRect.left) + (knobRect.width / 2) + 40; // Account for canvas offset
           const explosionY = (knobRect.top - panelRect.top) + (knobRect.height / 2) + 40;
           
+          // Completely hide knob immediately - use !important via setProperty to override any styles
+          knob.style.setProperty('transition', 'none', 'important');
+          knob.style.setProperty('opacity', '0', 'important');
+          knob.style.setProperty('visibility', 'hidden', 'important');
+          knob.style.setProperty('display', 'none', 'important');
+          knob.style.setProperty('pointer-events', 'none', 'important');
+          knob.style.setProperty('width', '0', 'important');
+          knob.style.setProperty('height', '0', 'important');
+          knob.style.setProperty('transform', 'scale(0)', 'important');
+          knob.style.setProperty('box-shadow', 'none', 'important');
+          knob.style.setProperty('left', knob.style.left, 'important'); // Preserve position
+          knob.style.setProperty('top', knob.style.top, 'important'); // Preserve position
+          
+          if (glow) {
+            glow.style.setProperty('opacity', '0', 'important');
+            glow.style.setProperty('visibility', 'hidden', 'important');
+            glow.style.setProperty('display', 'none', 'important');
+            glow.style.setProperty('pointer-events', 'none', 'important');
+          }
+          
           // Create explosion at knob position
           const trackWidth = wrap.getBoundingClientRect().width;
-          panelFx.extravagantBurst(explosionX, explosionY, strength, trackWidth, pullDistance);
+          panelFx.extravagantBurst(explosionX, explosionY, strength, trackWidth, pullDistance, knob);
         }
       }
 
@@ -1413,18 +1580,50 @@ function makeSlider(opts){
         target = dest;
         display = dest;
         
-        // Fade in knob a little after small balls fade out (balls fade 2s-4s, so start after 4s)
-        const ballsFadeOutEnd = 4000; // Balls finish fading at 4s (2s visible + 2s fade)
-        const fadeDelay = 300; // Small delay after balls fade out
-        const fadeStartTime = ballsFadeOutEnd + fadeDelay; // Start fading in after balls are gone
-        const fadeDuration = 2000; // Fade in over 2 seconds (same speed as balls fade out)
+        // Fade in knob independently after a fixed delay
+        const fadeDelay = 2000; // Start fading in after 2 seconds
+        const fadeDuration = 3000; // Fade in slowly over 3 seconds
         
-        // Start fade in after balls have faded out
+        // Start fade in after delay - independent of particles
         setTimeout(() => {
-          knob.style.transition = `opacity ${fadeDuration}ms linear`;
-          knob.style.opacity = "1";
-          knobHidden = false; // Re-enable interaction as it fades in
-        }, fadeStartTime);
+          // First, restore display and visibility (but keep opacity at 0 for fade)
+          knob.style.removeProperty('display');
+          knob.style.removeProperty('visibility');
+          knob.style.removeProperty('pointer-events');
+          knob.style.removeProperty('width');
+          knob.style.removeProperty('height');
+          knob.style.removeProperty('transform');
+          knob.style.removeProperty('box-shadow');
+          
+          // Restore normal styles but keep opacity at 0 initially
+          knob.style.display = "";
+          knob.style.visibility = "visible";
+          knob.style.pointerEvents = "";
+          knob.style.width = "";
+          knob.style.height = "";
+          knob.style.transform = "";
+          knob.style.boxShadow = "";
+          
+          // Set opacity to 0 first, then apply transition and fade to 1
+          knob.style.opacity = "0";
+          
+          // Use requestAnimationFrame to ensure the 0 opacity is applied before transition
+          requestAnimationFrame(() => {
+            knob.style.transition = `opacity ${fadeDuration}ms linear`;
+            knob.style.opacity = "1";
+            knobHidden = false; // Re-enable interaction as it fades in
+          });
+          
+          // Also restore glow
+          if (glow) {
+            glow.style.removeProperty('opacity');
+            glow.style.removeProperty('visibility');
+            glow.style.removeProperty('display');
+            glow.style.removeProperty('pointer-events');
+            glow.style.display = "";
+            glow.style.visibility = "visible";
+          }
+        }, fadeDelay);
         
         lastSettleTime = performance.now();
         opts.onChange?.(value);
@@ -1470,8 +1669,9 @@ function makeSlider(opts){
 
   function onDown(e){
     if (isDown) return;
-    // Prevent interaction if knob is hidden after explosion
-    if (knobHidden) return;
+    // Prevent interaction if knob is hidden (opacity is 0 or very low)
+    const knobOpacity = parseFloat(knob.style.opacity) || 1;
+    if (knobOpacity < 0.1) return;
     e.preventDefault();
 
     // iOS audio: attempt resume on gesture
@@ -1860,14 +2060,14 @@ function slingshotFX({ strength, dir, wrap }){
   // Function kept for compatibility but does nothing
 }
 
-function slingshotLandFX({ strength, dest, wrap, pullDistance }){
+function slingshotLandFX({ strength, dest, wrap, pullDistance, knob }){
   const wr = wrap.getBoundingClientRect();
   const pr = panelEl.getBoundingClientRect();
   const x = (wr.left - pr.left) + (dest === 1 ? wr.width : 0) + 40;
   const y = (wr.top - pr.top) + (wr.height / 2) + 40;
   // Pass track width and pull distance so particles can match slingshot speed
   const trackWidth = wr.width;
-  panelFx.extravagantBurst(x, y, strength, trackWidth, pullDistance);
+  panelFx.extravagantBurst(x, y, strength, trackWidth, pullDistance, knob);
 }
 
 function eggPullAllowed(){
@@ -1891,7 +2091,7 @@ function eggFire({ wrap, knob }){
   // Get track width from one of the sliders for speed calculation
   const trackWidth = document.getElementById("wrapTone")?.getBoundingClientRect().width || pr.width * 0.8;
   // Use default pull distance for egg fire
-  panelFx.extravagantBurst(pr.width * 0.5 + 40, 20, 1.0, trackWidth, 0.12);
+  panelFx.extravagantBurst(pr.width * 0.5 + 40, 20, 1.0, trackWidth, 0.12, knob);
 }
 
 const sliderTone = makeSlider({
