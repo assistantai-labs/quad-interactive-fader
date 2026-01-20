@@ -330,9 +330,12 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      padding-top: 20px;
+      padding-top: 20px; /* Fixed distance from rows above */
+      padding-bottom: 0;
+      margin-bottom: 0;
       position: relative;
       z-index: 2;
+      flex-shrink: 0; /* Never shrink */
     }
 
     .btn {
@@ -365,40 +368,54 @@
 
     @media (max-width: 520px){
       .stage {
-        padding: 6px 10px 6px;
-        gap: 8px;
+        padding: 4px 8px 4px;
+        gap: 6px;
         min-height: 100vh;
-        height: auto;
+        height: 100vh;
         max-height: 100vh;
         justify-content: flex-start;
-        padding-top: max(6px, env(safe-area-inset-top));
-        padding-bottom: max(6px, env(safe-area-inset-bottom));
+        padding-top: max(4px, env(safe-area-inset-top));
+        padding-bottom: max(4px, env(safe-area-inset-bottom));
+        overflow: hidden; /* Prevent scrolling */
       }
       
+      /* EXACT HEIGHTS FOR MOBILE:
+       * Total viewport: 100vh
+       * Stage padding top: 4px + safe area
+       * Stage padding bottom: 4px + safe area  
+       * Gap between viz3d and panel: 6px
+       * 
+       * Visualizer: 28vh (exact: ~200px on iPhone)
+       * Panel: calc(100vh - 28vh - 6px gap - 8px total padding) = ~66vh
+       */
       .viz3d {
         width: 100%;
         max-width: 100%;
-        height: min(32vh, 220px);
+        height: 28vh; /* EXACT: 28% of viewport height */
         min-height: 180px;
-        margin: 0 auto 0 auto;
+        max-height: 200px;
+        margin: 0;
         flex-shrink: 0;
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;
         z-index: 1;
         position: relative;
+        order: -1; /* Force visualizer above panel */
       }
       
       .panel {
         width: 100%;
         max-width: 100%;
-        padding: 10px 8px 10px;
-        border-radius: 18px;
+        padding: 8px 6px 16px; /* Fixed 16px bottom padding for permanent distance from play button */
+        border-radius: 16px;
         flex: 1 1 auto;
         min-height: 0;
+        max-height: calc(100vh - 28vh - 6px - 8px); /* EXACT: remaining space */
         display: flex;
         flex-direction: column;
-        max-height: calc(100vh - min(32vh, 220px) - 30px);
+        overflow: hidden; /* Prevent panel from overflowing */
+        order: 1; /* Force panel below visualizer */
       }
       
       .rows {
@@ -406,17 +423,20 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 3px;
+        overflow: hidden;
       }
       
       .controls {
-        padding-top: 6px;
+        padding-top: 16px; /* Fixed exact distance from rows above */
+        padding-bottom: 0;
+        margin-bottom: 0;
         flex-shrink: 0;
       }
       
       :root {
         --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(30px, 5vw, 50px));
-        --rowGap: clamp(10px, 1.8vw, 14px);
+        --rowGap: clamp(8px, 1.5vw, 12px);
       }
     }
     
@@ -2322,8 +2342,9 @@ setTimeout(() => {
     const isMobile = window.innerWidth <= 520;
     if (isMobile) {
       viz3dContainer.style.width = '100%';
-      viz3dContainer.style.height = 'min(35vh, 240px)';
-      viz3dContainer.style.minHeight = '200px';
+      viz3dContainer.style.height = '28vh'; // EXACT: 28% of viewport height
+      viz3dContainer.style.minHeight = '180px';
+      viz3dContainer.style.maxHeight = '200px';
     } else {
       viz3dContainer.style.width = 'min(920px, 96vw)';
       viz3dContainer.style.height = '400px';
@@ -2338,8 +2359,9 @@ setTimeout(() => {
   
   // Ensure container has dimensions - use actual container size or mobile defaults
   const isMobile = window.innerWidth <= 520;
-  const defaultWidth = isMobile ? Math.max(viz3dContainer.clientWidth || window.innerWidth - 24, 300) : 400;
-  const defaultHeight = isMobile ? Math.max(viz3dContainer.clientHeight || 200, 200) : 300;
+  // EXACT HEIGHTS: On mobile, visualizer is 28vh (approximately 200px on iPhone)
+  const defaultWidth = isMobile ? Math.max(viz3dContainer.clientWidth || window.innerWidth - 16, 300) : 400;
+  const defaultHeight = isMobile ? Math.max(viz3dContainer.clientHeight || (window.innerHeight * 0.28), 180) : 300;
   const width = Math.max(viz3dContainer.clientWidth || defaultWidth, defaultWidth);
   const height = Math.max(viz3dContainer.clientHeight || defaultHeight, defaultHeight);
   
@@ -2904,8 +2926,9 @@ setTimeout(() => {
   // Step 10: Handle resize
   function handleResize() {
     const isMobile = window.innerWidth <= 520;
-    const defaultWidth = isMobile ? Math.max(viz3dContainer.clientWidth || window.innerWidth - 24, 300) : 400;
-    const defaultHeight = isMobile ? Math.max(viz3dContainer.clientHeight || 180, 180) : 300;
+    // EXACT HEIGHTS: On mobile, visualizer is 28vh (approximately 200px on iPhone)
+    const defaultWidth = isMobile ? Math.max(viz3dContainer.clientWidth || window.innerWidth - 16, 300) : 400;
+    const defaultHeight = isMobile ? Math.max(viz3dContainer.clientHeight || (window.innerHeight * 0.28), 180) : 300;
     const width = Math.max(viz3dContainer.clientWidth || defaultWidth, defaultWidth);
     const height = Math.max(viz3dContainer.clientHeight || defaultHeight, defaultHeight);
     camera.aspect = width / height;
