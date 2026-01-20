@@ -128,8 +128,8 @@
       border-radius: 22px;
       margin: 0 auto 20px auto;
       position: relative;
-      overflow: hidden;
-      box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+      overflow: visible; /* Allow content to extend beyond bounds */
+      box-shadow: none; /* Remove shadow since background is transparent */
       order: -1; /* Ensure it appears first in flex column */
     }
     
@@ -137,6 +137,7 @@
       display: block;
       width: 100%;
       height: 100%;
+      background: transparent !important;
     }
     
     .viz3dControls {
@@ -2286,14 +2287,19 @@ setTimeout(() => {
   camera.lookAt(cameraAngles[1].target.x, cameraAngles[1].target.y, cameraAngles[1].target.z);
   currentCameraPos.copy(camera.position);
   
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ 
+    antialias: true, 
+    alpha: true,
+    premultipliedAlpha: false // Important for proper transparency
+  });
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   renderer.setPixelRatio(dpr);
   renderer.setSize(width, height);
-  renderer.setClearColor(0x000000, 0); // Transparent background
+  renderer.setClearColor(0x000000, 0); // Fully transparent background
   renderer.domElement.style.width = '100%';
   renderer.domElement.style.height = '100%';
   renderer.domElement.style.display = 'block';
+  renderer.domElement.style.backgroundColor = 'transparent';
   viz3dContainer.appendChild(renderer.domElement);
   
   console.log('Renderer created, canvas added to container');
@@ -2546,16 +2552,20 @@ setTimeout(() => {
     if (controls && controls.enabled) {
       controls.update();
     }
+    // Ensure transparency is maintained each frame
+    renderer.setClearColor(0x000000, 0);
     renderer.render(scene, camera);
   }
   
   // Step 10: Handle resize
   function handleResize() {
-    const width = viz3dContainer.clientWidth;
-    const height = viz3dContainer.clientHeight;
+    const width = Math.max(viz3dContainer.clientWidth, 400);
+    const height = Math.max(viz3dContainer.clientHeight, 300);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+    // Ensure canvas stays transparent
+    renderer.setClearColor(0x000000, 0);
   }
   
   window.addEventListener('resize', handleResize);
