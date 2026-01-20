@@ -1616,8 +1616,8 @@ function makeSlider(opts){
         display = dest;
         setKnobFromDisplay(); // Set position first
         
-        // Hide knob completely and create explosion effect when it hits the wall
-        if (!exploded) {
+        // Only hide knob and create explosion if full speed slingshot
+        if (!exploded && strength >= 0.95) {
           exploded = true;
           explosionTime = now;
           knobHidden = true;
@@ -1663,50 +1663,53 @@ function makeSlider(opts){
         target = dest;
         display = dest;
         
-        // Fade in knob independently after a fixed delay
-        const fadeDelay = 2000; // Start fading in after 2 seconds
-        const fadeDuration = 3000; // Fade in slowly over 3 seconds
-        
-        // Start fade in after delay - independent of particles
-        setTimeout(() => {
-          // First, restore display and visibility (but keep opacity at 0 for fade)
-          knob.style.removeProperty('display');
-          knob.style.removeProperty('visibility');
-          knob.style.removeProperty('pointer-events');
-          knob.style.removeProperty('width');
-          knob.style.removeProperty('height');
-          knob.style.removeProperty('transform');
-          knob.style.removeProperty('box-shadow');
+        // Only fade in knob if it was actually hidden (i.e., explosion happened)
+        if (knobHidden) {
+          // Fade in knob independently after a fixed delay
+          const fadeDelay = 2000; // Start fading in after 2 seconds
+          const fadeDuration = 3000; // Fade in slowly over 3 seconds
           
-          // Restore normal styles but keep opacity at 0 initially
-          knob.style.display = "";
-          knob.style.visibility = "visible";
-          knob.style.pointerEvents = "";
-          knob.style.width = "";
-          knob.style.height = "";
-          knob.style.transform = "";
-          knob.style.boxShadow = "";
-          
-          // Set opacity to 0 first, then apply transition and fade to 1
-          knob.style.opacity = "0";
-          
-          // Use requestAnimationFrame to ensure the 0 opacity is applied before transition
-          requestAnimationFrame(() => {
-            knob.style.transition = `opacity ${fadeDuration}ms linear`;
-            knob.style.opacity = "1";
-            knobHidden = false; // Re-enable interaction as it fades in
-          });
-          
-          // Also restore glow
-          if (glow) {
-            glow.style.removeProperty('opacity');
-            glow.style.removeProperty('visibility');
-            glow.style.removeProperty('display');
-            glow.style.removeProperty('pointer-events');
-            glow.style.display = "";
-            glow.style.visibility = "visible";
-          }
-        }, fadeDelay);
+          // Start fade in after delay - independent of particles
+          setTimeout(() => {
+            // First, restore display and visibility (but keep opacity at 0 for fade)
+            knob.style.removeProperty('display');
+            knob.style.removeProperty('visibility');
+            knob.style.removeProperty('pointer-events');
+            knob.style.removeProperty('width');
+            knob.style.removeProperty('height');
+            knob.style.removeProperty('transform');
+            knob.style.removeProperty('box-shadow');
+            
+            // Restore normal styles but keep opacity at 0 initially
+            knob.style.display = "";
+            knob.style.visibility = "visible";
+            knob.style.pointerEvents = "";
+            knob.style.width = "";
+            knob.style.height = "";
+            knob.style.transform = "";
+            knob.style.boxShadow = "";
+            
+            // Set opacity to 0 first, then apply transition and fade to 1
+            knob.style.opacity = "0";
+            
+            // Use requestAnimationFrame to ensure the 0 opacity is applied before transition
+            requestAnimationFrame(() => {
+              knob.style.transition = `opacity ${fadeDuration}ms linear`;
+              knob.style.opacity = "1";
+              knobHidden = false; // Re-enable interaction as it fades in
+            });
+            
+            // Also restore glow
+            if (glow) {
+              glow.style.removeProperty('opacity');
+              glow.style.removeProperty('visibility');
+              glow.style.removeProperty('display');
+              glow.style.removeProperty('pointer-events');
+              glow.style.display = "";
+              glow.style.visibility = "visible";
+            }
+          }, fadeDelay);
+        }
         
         lastSettleTime = performance.now();
         opts.onChange?.(value);
@@ -2144,6 +2147,9 @@ function slingshotFX({ strength, dir, wrap }){
 }
 
 function slingshotLandFX({ strength, dest, wrap, pullDistance, knob }){
+  // Only create explosion if slingshot is at full speed
+  if (strength < 0.95) return; // Skip explosion for slower slingshots
+  
   const wr = wrap.getBoundingClientRect();
   const pr = panelEl.getBoundingClientRect();
   const x = (wr.left - pr.left) + (dest === 1 ? wr.width : 0) + 40;
