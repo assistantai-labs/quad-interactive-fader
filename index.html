@@ -1414,11 +1414,13 @@ function makeSlider(opts){
         target = dest;
         display = dest;
         
-        // Fade in knob at the same speed balls fade out (starts at 2s, fades over 2s, ends at 4s)
-        const fadeStartTime = 2000; // Start fading in when balls start fading out (2s)
-        const fadeDuration = 2000; // Fade in over 2 seconds (same as balls fade out)
+        // Fade in knob a little after small balls fade out (balls fade 2s-4s, so start after 4s)
+        const ballsFadeOutEnd = 4000; // Balls finish fading at 4s (2s visible + 2s fade)
+        const fadeDelay = 300; // Small delay after balls fade out
+        const fadeStartTime = ballsFadeOutEnd + fadeDelay; // Start fading in after balls are gone
+        const fadeDuration = 2000; // Fade in over 2 seconds (same speed as balls fade out)
         
-        // Start fade in
+        // Start fade in after balls have faded out
         setTimeout(() => {
           knob.style.transition = `opacity ${fadeDuration}ms linear`;
           knob.style.opacity = "1";
