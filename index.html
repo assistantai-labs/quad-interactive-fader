@@ -19,17 +19,11 @@
     }
 
     html, body {
-      height: auto;
-      min-height: 100%;
-      width: 100%;
-      max-width: 100%;
+      height: 100%;
       margin: 0;
       padding: 0;
       background: transparent;
-      overflow-x: hidden; /* Prevent horizontal scrolling */
-      overflow-y: auto; /* Allow vertical scrolling */
-      overscroll-behavior-x: none; /* Prevent horizontal overscroll from affecting parent */
-      overscroll-behavior-y: auto; /* Allow vertical overscroll to pass to parent */
+      overflow-x: hidden; /* kill sideways drag */
     }
 
     body {
@@ -39,9 +33,8 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
-      touch-action: pan-y pinch-zoom; /* Allow vertical panning, prevent horizontal */
-      overflow-x: hidden;
-      overflow-y: auto;
+      touch-action: pan-y pinch-zoom;
+      overflow: hidden; /* the app itself should not scroll on desktop */
     }
     
     /* Wrapper to clamp horizontal overflow and prevent horizontal scroll */
@@ -69,22 +62,52 @@
       pointer-events: auto; /* Intercept touches for parent page scrolling */
     }
 
-    .stage {
-      min-height: 100vh;
-      height: auto;
+    /* New app layout structure */
+    .app {
+      height: 100dvh; /* correct on iOS + desktop */
       width: 100%;
-      max-width: 100%;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      box-sizing: border-box;
+    }
+
+    .vizWrap {
+      flex: 1 1 auto; /* take remaining space */
+      min-height: 0; /* critical: allows flex child to shrink */
+      display: flex;
       align-items: center;
       justify-content: center;
-      padding: 40px 16px 40px;
-      box-sizing: border-box;
-      background: transparent;
+      overflow: hidden;
       position: relative;
-      gap: 20px;
-      overflow-x: hidden; /* Prevent horizontal scrolling */
-      overflow-y: visible; /* Allow content to flow vertically */
+    }
+
+    .vizWrap canvas,
+    .vizWrap .threeCanvas,
+    .vizWrap .renderer,
+    .vizWrap .stageCanvas,
+    .vizWrap canvas[data-engine] {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    .controlsWrap {
+      flex: 0 0 auto; /* NEVER stretch */
+      height: auto !important;
+      min-height: 0 !important;
+      display: flex;
+      justify-content: center;
+      padding: 12px 16px 16px;
+      box-sizing: border-box;
+    }
+
+    /* Legacy .stage class for backwards compatibility */
+    .stage {
+      /* Deprecated - use .app instead */
+      display: none;
     }
 
     .profileBadge {
@@ -160,6 +183,8 @@
     }
     
     .viz3d {
+      /* Width will be dynamically set by JavaScript to match panel width */
+      /* Default fallback width for initial render */
       width: min(920px, 96vw);
       max-width: 100%;
       height: 400px;
@@ -234,8 +259,15 @@
       color: #fff;
       position: relative;
       overflow: visible; /* allow FX beyond bounds */
-      flex-shrink: 1; /* Allow panel to shrink on mobile */
+      height: fit-content !important;
+      min-height: 0 !important;
+      max-height: none !important;
       touch-action: pan-x pinch-zoom; /* Allow horizontal pan for sliders, prevent vertical scroll on panel */
+    }
+
+    /* Ensure panel children don't force height */
+    .panel * {
+      min-height: 0;
     }
 
     /* Panel-wide FX overlay so explosions never clip */
@@ -397,97 +429,91 @@
     }
 
 
-    @media (max-width: 520px){
+    @media (max-width: 767px){
       html, body {
-        overflow-x: hidden !important; /* Prevent horizontal scroll */
-        overflow-y: auto !important; /* Allow vertical scroll */
-        width: 100% !important;
-        height: auto !important;
-        min-height: 100vh !important;
+        height: 100% !important;
+        overflow-x: hidden !important;
+        overflow-y: hidden !important;
       }
       
-      .stage {
-        padding: 0 8px 0; /* Reduced top/bottom padding to minimize space above visualizer */
-        gap: 6px;
-        min-height: 100vh; /* Minimum height, but can grow */
-        height: auto;
-        justify-content: flex-start;
-        padding-top: max(0px, env(safe-area-inset-top)); /* Minimal top padding */
-        padding-bottom: max(0px, env(safe-area-inset-bottom)); /* Minimal bottom padding */
-        overflow-x: hidden; /* Prevent horizontal scrolling */
-        overflow-y: visible; /* Allow content to flow */
-        position: relative;
-        box-sizing: border-box;
-        flex-shrink: 0;
-        flex-grow: 0;
+      .app {
+        height: 100dvh !important;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
       }
       
-      /* EXACT HEIGHTS FOR MOBILE - FIXED, NO EXTENSION:
-       * Total viewport: 100vh
-       * Stage padding top: 4px + safe area
-       * Stage padding bottom: 4px + safe area  
-       * Gap between viz3d and panel: 6px
-       * 
-       * Visualizer: 28vh (exact: ~200px on iPhone)
-       * Panel: calc(100vh - 28vh - 6px gap - 8px total padding) = ~66vh
-       */
+      .vizWrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 0 8px;
+      }
+      
       .viz3d {
         width: 100%;
         max-width: 100%;
-        height: 28vh !important; /* EXACT: 28% of viewport height - fixed */
-        min-height: 28vh !important;
-        max-height: 28vh !important;
+        height: 100%;
         margin: 0;
-        flex-shrink: 0;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        z-index: 1;
-        position: relative;
-        order: -1; /* Force visualizer above panel */
-        overflow: hidden;
-        box-sizing: border-box;
+        border-radius: 16px;
+      }
+      
+      .controlsWrap {
+        flex: 0 0 auto;
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 12px 8px 12px;
       }
       
       .panel {
-        width: calc(100% - 16px); /* Add visual padding by reducing width */
+        width: calc(100% - 16px);
         max-width: calc(100% - 16px);
-        margin: 0 8px; /* Visual padding on left and right */
-        padding: 12px 10px 12px; /* Reduced bottom padding from 16px to 12px to minimize space below play button */
+        margin: 0 auto;
+        padding: 12px 10px 12px;
         border-radius: 16px;
-        min-height: calc(100vh - 28vh - 6px); /* Removed extra padding calculation - let content determine height */
-        height: auto; /* Allow content to determine height */
+        height: fit-content !important;
+        min-height: 0 !important;
+        max-height: none !important;
         display: flex !important;
         flex-direction: column !important;
-        overflow-x: hidden; /* Prevent horizontal overflow */
-        overflow-y: visible; /* Allow vertical content flow */
-        order: 1; /* Force panel below visualizer */
-        position: relative;
-        flex-shrink: 0 !important; /* Never shrink */
-        flex-grow: 0 !important; /* Never grow */
-        box-sizing: border-box;
+        overflow-x: hidden;
+        overflow-y: visible;
+      }
+      
+      .panel * {
+        min-height: 0;
       }
       
       .rows {
-        flex: 0 0 auto !important; /* Fixed size - do not grow or shrink */
-        min-height: auto;
-        max-height: none;
+        flex: 0 0 auto;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         gap: 3px;
-        overflow: hidden !important; /* Prevent overflow */
-        flex-shrink: 0;
-        box-sizing: border-box;
+        overflow: visible;
       }
       
       .controls {
-        padding-top: 12px !important; /* Reduced from 16px to minimize space above play button */
+        padding-top: 12px;
         padding-bottom: 0;
         margin-bottom: 0;
         flex-shrink: 0;
         flex-grow: 0;
-        position: relative;
-        margin-top: 0; /* No auto margin - fixed position */
+      }
+    }
+    
+    /* Tighten spacing on short screens */
+    @media (max-height: 760px) {
+      .controlsWrap {
+        padding: 10px 14px 14px;
+      }
+      .panel {
+        padding-bottom: 14px;
+      }
+    }
+    
+    /* Optional: slightly shrink the 3D model area on very short screens so everything fits */
+    @media (max-height: 700px) {
+      .vizWrap {
+        padding-top: 6px;
       }
       
       :root {
@@ -509,15 +535,18 @@
   <div class="iframe-wrapper">
     <div class="scroll-overlay" id="scrollOverlay"></div>
     <div class="rewardWave" id="rewardWave"></div>
-    <div class="stage">
-    <div class="viz3d" id="viz3d">
-      <div class="viz3dControls">
-        <button class="viz3dAngleBtn active" data-angle="1">1</button>
-        <button class="viz3dAngleBtn" data-angle="2">2</button>
-        <button class="viz3dAngleBtn" data-angle="3">3</button>
+    <div class="app">
+      <div class="vizWrap">
+        <div class="viz3d" id="viz3d">
+          <div class="viz3dControls">
+            <button class="viz3dAngleBtn active" data-angle="1">1</button>
+            <button class="viz3dAngleBtn" data-angle="2">2</button>
+            <button class="viz3dAngleBtn" data-angle="3">3</button>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="panel" id="panel">
+      <div class="controlsWrap">
+        <div class="panel" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
 
 
@@ -551,12 +580,13 @@
         </div>
       </div>
 
-      <div class="controls">
-        <button class="btn" id="btnPlay">PLAY</button>
+          <div class="controls">
+            <button class="btn" id="btnPlay">PLAY</button>
+          </div>
+        </div>
       </div>
     </div>
     <canvas id="viz" class="viz"></canvas>
-  </div>
   </div> <!-- End iframe-wrapper -->
 
 <script>
@@ -2394,21 +2424,9 @@ setTimeout(() => {
     return;
   }
   
-  // Ensure container has dimensions
-  if (viz3dContainer.clientWidth === 0 || viz3dContainer.clientHeight === 0) {
-    console.warn('Container has no dimensions, setting defaults');
-    // Use viewport-based sizing for mobile
-    const isMobile = window.innerWidth <= 520;
-    if (isMobile) {
-      viz3dContainer.style.width = '100%';
-      viz3dContainer.style.height = '28vh'; // EXACT: 28% of viewport height
-      viz3dContainer.style.minHeight = '180px';
-      viz3dContainer.style.maxHeight = '200px';
-    } else {
-      viz3dContainer.style.width = 'min(920px, 96vw)';
-      viz3dContainer.style.height = '400px';
-    }
-  }
+  // Get the vizWrap container (parent of viz3d)
+  const vizWrap = viz3dContainer.parentElement;
+  const panelEl = document.getElementById('panel');
   
   console.log('Initializing 3D spectrogram, container size:', viz3dContainer.clientWidth, 'x', viz3dContainer.clientHeight);
   
@@ -2416,13 +2434,9 @@ setTimeout(() => {
   const scene = new THREE.Scene();
   scene.background = null; // Transparent background
   
-  // Ensure container has dimensions - use actual container size or mobile defaults
-  const isMobile = window.innerWidth <= 520;
-  // EXACT HEIGHTS: On mobile, visualizer is 28vh (approximately 200px on iPhone)
-  const defaultWidth = isMobile ? Math.max(viz3dContainer.clientWidth || window.innerWidth - 16, 300) : 400;
-  const defaultHeight = isMobile ? Math.max(viz3dContainer.clientHeight || (window.innerHeight * 0.28), 180) : 300;
-  const width = Math.max(viz3dContainer.clientWidth || defaultWidth, defaultWidth);
-  const height = Math.max(viz3dContainer.clientHeight || defaultHeight, defaultHeight);
+  // Use actual container dimensions - will be updated by ResizeObserver
+  const width = Math.max(viz3dContainer.clientWidth || 400, 1);
+  const height = Math.max(viz3dContainer.clientHeight || 300, 1);
   
   const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
   
@@ -2474,6 +2488,66 @@ setTimeout(() => {
   viz3dContainer.appendChild(renderer.domElement);
   
   console.log('Renderer created, canvas added to container');
+  
+  // Set up ResizeObserver on vizWrap to update renderer when container size changes
+  // This ensures the 3D view uses the actual vizWrap size, not window size
+  if (vizWrap) {
+    const resizeObserver = new ResizeObserver(() => {
+      const rect = vizWrap.getBoundingClientRect();
+      const newWidth = Math.max(1, Math.floor(rect.width));
+      const newHeight = Math.max(1, Math.floor(rect.height));
+      
+      // Update renderer size
+      renderer.setSize(newWidth, newHeight, false);
+      camera.aspect = newWidth / newHeight;
+      camera.updateProjectionMatrix();
+    });
+    resizeObserver.observe(vizWrap);
+  }
+  
+  // Also sync visualizer width with panel width dynamically
+  if (panelEl) {
+    const syncVisualizerWidth = () => {
+      const panelRect = panelEl.getBoundingClientRect();
+      const panelWidth = panelRect.width;
+      
+      // Match panel width - use max-width to constrain but allow natural sizing
+      viz3dContainer.style.maxWidth = panelWidth + 'px';
+      
+      // Update renderer if dimensions changed
+      if (vizWrap) {
+        const rect = vizWrap.getBoundingClientRect();
+        const newWidth = Math.max(1, Math.floor(rect.width));
+        const newHeight = Math.max(1, Math.floor(rect.height));
+        renderer.setSize(newWidth, newHeight, false);
+        camera.aspect = newWidth / newHeight;
+        camera.updateProjectionMatrix();
+      }
+    };
+    
+    // Watch panel for width changes
+    const panelResizeObserver = new ResizeObserver(() => {
+      syncVisualizerWidth();
+    });
+    panelResizeObserver.observe(panelEl);
+    
+    // Initial sync
+    setTimeout(syncVisualizerWidth, 150);
+  }
+  
+  // Handle orientation changes
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      if (vizWrap) {
+        const rect = vizWrap.getBoundingClientRect();
+        const newWidth = Math.max(1, Math.floor(rect.width));
+        const newHeight = Math.max(1, Math.floor(rect.height));
+        renderer.setSize(newWidth, newHeight, false);
+        camera.aspect = newWidth / newHeight;
+        camera.updateProjectionMatrix();
+      }
+    }, 250);
+  });
   
   // Step 2: Add OrbitControls (disabled when using preset angles)
   let controls;
@@ -3055,18 +3129,17 @@ setTimeout(() => {
     renderer.render(scene, camera);
   }
   
-  // Step 10: Handle resize
+  // Step 10: Handle resize - use ResizeObserver on vizWrap (handled above)
   function handleResize() {
-    const isMobile = window.innerWidth <= 520;
-    // EXACT HEIGHTS: On mobile, visualizer is 28vh (approximately 200px on iPhone)
-    const defaultWidth = isMobile ? Math.max(viz3dContainer.clientWidth || window.innerWidth - 16, 300) : 400;
-    const defaultHeight = isMobile ? Math.max(viz3dContainer.clientHeight || (window.innerHeight * 0.28), 180) : 300;
-    const width = Math.max(viz3dContainer.clientWidth || defaultWidth, defaultWidth);
-    const height = Math.max(viz3dContainer.clientHeight || defaultHeight, defaultHeight);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height);
-    // Ensure canvas stays transparent
+    // ResizeObserver handles this automatically, but update if needed
+    if (vizWrap) {
+      const rect = vizWrap.getBoundingClientRect();
+      const newWidth = Math.max(1, Math.floor(rect.width));
+      const newHeight = Math.max(1, Math.floor(rect.height));
+      renderer.setSize(newWidth, newHeight, false);
+      camera.aspect = newWidth / newHeight;
+      camera.updateProjectionMatrix();
+    }
     renderer.setClearColor(0x000000, 0);
   }
   
