@@ -542,6 +542,7 @@
             <button class="viz3dAngleBtn active" data-angle="1">1</button>
             <button class="viz3dAngleBtn" data-angle="2">2</button>
             <button class="viz3dAngleBtn" data-angle="3">3</button>
+            <button class="viz3dAngleBtn" id="btnOrbit" data-orbit="free">FREE</button>
           </div>
         </div>
       </div>
@@ -2438,7 +2439,8 @@ setTimeout(() => {
   const width = Math.max(viz3dContainer.clientWidth || 400, 1);
   const height = Math.max(viz3dContainer.clientHeight || 300, 1);
   
-  const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+  // Increased FOV to 75 degrees and adjusted near/far planes to prevent clipping when rotating
+  const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 2000);
   
   // Define three camera angles (zoomed out by 65%)
   const cameraAngles = {
@@ -2475,7 +2477,9 @@ setTimeout(() => {
   const renderer = new THREE.WebGLRenderer({ 
     antialias: true, 
     alpha: true,
-    premultipliedAlpha: false // Important for proper transparency
+    premultipliedAlpha: false, // Important for proper transparency
+    preserveDrawingBuffer: false,
+    powerPreference: "high-performance"
   });
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   renderer.setPixelRatio(dpr);
@@ -2489,21 +2493,27 @@ setTimeout(() => {
   
   console.log('Renderer created, canvas added to container');
   
-  // Set up ResizeObserver on vizWrap to update renderer when container size changes
-  // This ensures the 3D view uses the actual vizWrap size, not window size
-  if (vizWrap) {
-    const resizeObserver = new ResizeObserver(() => {
-      const rect = vizWrap.getBoundingClientRect();
-      const newWidth = Math.max(1, Math.floor(rect.width));
-      const newHeight = Math.max(1, Math.floor(rect.height));
-      
-      // Update renderer size
-      renderer.setSize(newWidth, newHeight, false);
-      camera.aspect = newWidth / newHeight;
-      camera.updateProjectionMatrix();
-    });
-    resizeObserver.observe(vizWrap);
-  }
+  // Set up ResizeObserver on viz3dContainer to update renderer when container size changes
+  // This ensures the 3D view uses the actual viz3dContainer size, not window size
+  const updateRendererSize = () => {
+    const rect = viz3dContainer.getBoundingClientRect();
+    const newWidth = Math.max(1, Math.floor(rect.width));
+    const newHeight = Math.max(1, Math.floor(rect.height));
+    
+    // Update renderer size to match container exactly
+    renderer.setSize(newWidth, newHeight, false);
+    camera.aspect = newWidth / newHeight;
+    camera.updateProjectionMatrix();
+    
+    // Ensure renderer viewport matches container bounds
+    renderer.setViewport(0, 0, newWidth, newHeight);
+  };
+  
+  // Observe viz3dContainer for size changes
+  const containerResizeObserver = new ResizeObserver(() => {
+    updateRendererSize();
+  });
+  containerResizeObserver.observe(viz3dContainer);
   
   // Also sync visualizer width with panel width dynamically
   if (panelEl) {
@@ -2511,18 +2521,11 @@ setTimeout(() => {
       const panelRect = panelEl.getBoundingClientRect();
       const panelWidth = panelRect.width;
       
-      // Match panel width - use max-width to constrain but allow natural sizing
-      viz3dContainer.style.maxWidth = panelWidth + 'px';
+      // Make visualizer 40% smaller (60% of panel width)
+      viz3dContainer.style.width = (panelWidth * 0.6) + 'px';
       
-      // Update renderer if dimensions changed
-      if (vizWrap) {
-        const rect = vizWrap.getBoundingClientRect();
-        const newWidth = Math.max(1, Math.floor(rect.width));
-        const newHeight = Math.max(1, Math.floor(rect.height));
-        renderer.setSize(newWidth, newHeight, false);
-        camera.aspect = newWidth / newHeight;
-        camera.updateProjectionMatrix();
-      }
+      // Update renderer size after width change
+      updateRendererSize();
     };
     
     // Watch panel for width changes
@@ -2538,20 +2541,12 @@ setTimeout(() => {
   // Handle orientation changes
   window.addEventListener('orientationchange', () => {
     setTimeout(() => {
-      if (vizWrap) {
-        const rect = vizWrap.getBoundingClientRect();
-        const newWidth = Math.max(1, Math.floor(rect.width));
-        const newHeight = Math.max(1, Math.floor(rect.height));
-        renderer.setSize(newWidth, newHeight, false);
-        camera.aspect = newWidth / newHeight;
-        camera.updateProjectionMatrix();
-      }
+      updateRendererSize();
     }, 250);
   });
   
-  // Step 2: Add OrbitControls (disabled when using preset angles)
+  // Step 2: Add OrbitControls (enabled by default for drag-to-rotate)
   let controls;
-  let useOrbitControls = false; // Start with preset angles
   
   try {
     // OrbitControls might be on THREE or global scope
@@ -2565,14 +2560,14 @@ setTimeout(() => {
       controls.minDistance = 20;
       controls.maxDistance = 80;
       controls.target.set(0, 0, 0);
-      controls.enabled = false; // Disabled by default, using preset angles
+      controls.enabled = true; // Enabled by default - always allow dragging
       
       // Mobile touch support
       if (controls.touches) {
         controls.touches.ONE = THREE.TOUCH.ROTATE;
         controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
       }
-      console.log('OrbitControls initialized (disabled)');
+      console.log('OrbitControls initialized (enabled)');
     } else {
       console.warn('OrbitControls not available');
     }
@@ -2580,21 +2575,33 @@ setTimeout(() => {
     console.warn('Failed to create OrbitControls:', e);
   }
   
-  // Set up angle selection buttons
-  const angleButtons = viz3dContainer.querySelectorAll('.viz3dAngleBtn');
+  // Set up angle selection buttons (snap to preset angles, then allow free dragging)
+  const angleButtons = viz3dContainer.querySelectorAll('.viz3dAngleBtn[data-angle]');
+  
   angleButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const angleNum = parseInt(btn.dataset.angle);
       setCameraAngle(angleNum);
       
+      // Snap camera to preset angle, then allow free dragging
+      if (controls) {
+        isTransitioning = false; // Stop any transitions
+        const angle = cameraAngles[angleNum];
+        if (angle) {
+          camera.position.set(angle.position.x, angle.position.y, angle.position.z);
+          camera.lookAt(angle.target.x, angle.target.y, angle.target.z);
+          controls.target.set(angle.target.x, angle.target.y, angle.target.z);
+          // Update internal tracking
+          currentCameraPos.copy(camera.position);
+          targetCameraPos.copy(camera.position);
+        }
+        // Keep orbit controls enabled so user can drag after snapping
+        controls.enabled = true;
+      }
+      
       // Update button states
       angleButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      
-      // Disable orbit controls when using preset angles
-      if (controls) {
-        controls.enabled = false;
-      }
     });
   });
   
@@ -2643,7 +2650,8 @@ setTimeout(() => {
   // BEAT only (RAW + BEAT) = Orange and Yellow
   // MIXED + VOCALS = Pink and Purple
   // MIXED + BEAT (both high) = First version colors (purple → red → orange → yellow)
-  function getSpectrogramColor(energy, rawMix, vocalBeat) {
+  // Optimized: return {r,g,b} object instead of THREE.Color to avoid allocations
+  function getSpectrogramColor(energy, rawMix, vocalBeat, outColor = {r: 0, g: 0, b: 0}) {
     energy = Math.max(0, Math.min(1, energy));
     
     // Base gloom level
@@ -2751,16 +2759,19 @@ setTimeout(() => {
     const effectiveWeight = Math.max(rawMix, vocalBeat);
     
     if (effectiveWeight < 0.05) {
-      return new THREE.Color(gray, gray, gray);
+      outColor.r = gray;
+      outColor.g = gray;
+      outColor.b = gray;
+      return outColor;
     }
     
     // Smooth color application
     const litFactor = Math.min(1, effectiveWeight / 0.5);
-    const r = gray + (finalColor.r - gray) * litFactor;
-    const g = gray + (finalColor.g - gray) * litFactor;
-    const b = gray + (finalColor.b - gray) * litFactor;
+    outColor.r = gray + (finalColor.r - gray) * litFactor;
+    outColor.g = gray + (finalColor.g - gray) * litFactor;
+    outColor.b = gray + (finalColor.b - gray) * litFactor;
     
-    return new THREE.Color(r, g, b);
+    return outColor;
   }
   
   // Step 7: Create material with vertex colors
@@ -2871,14 +2882,16 @@ setTimeout(() => {
   }
   
   // Step 4: Get reward color (golden/white flash instead of rainbow)
-  function getRewardColor(t) {
+  // Optimized: reuse color object to avoid allocations
+  const rewardColorObj = {r: 0, g: 0, b: 0};
+  function getRewardColor(t, outColor = rewardColorObj) {
     // t: 0..1 across the sweep
     // Golden to white flash
     const intensity = Math.sin(t * Math.PI);
-    const r = 1.0;
-    const g = 0.8 + intensity * 0.2; // 0.8 to 1.0
-    const b = 0.3 + intensity * 0.7; // 0.3 to 1.0
-    return new THREE.Color(r, g, b);
+    outColor.r = 1.0;
+    outColor.g = 0.8 + intensity * 0.2; // 0.8 to 1.0
+    outColor.b = 0.3 + intensity * 0.7; // 0.3 to 1.0
+    return outColor;
   }
   
   function mixAmount() {
@@ -2907,6 +2920,9 @@ setTimeout(() => {
       const positions = geometry.attributes.position;
       const colors = geometry.attributes.color;
       
+      // Reusable color object to avoid allocations
+      const color = {r: 0, g: 0, b: 0};
+      
       for (let z = 0; z < historyLength; z++) {
         for (let x = 0; x < freqBins; x++) {
           const vertexIndex = z * freqBins + x;
@@ -2915,8 +2931,8 @@ setTimeout(() => {
           // Ensure vertex stays at Y=0 (flat) - no geometry movement before audio starts
           positions.setY(vertexIndex, 0);
           
-          // Get color based on current slider state (RAW+VOCALS = grey)
-          let color = getSpectrogramColor(energy, rawMix, vocalBeat);
+          // Get color based on current slider state (RAW+VOCALS = grey) - reuse color object
+          getSpectrogramColor(energy, rawMix, vocalBeat, color);
           
           // Apply minimum brightness floor to prevent pure black
           const gloomFactor = (1 - rawMix) * (1 - vocalBeat);
@@ -2991,6 +3007,9 @@ setTimeout(() => {
     const baseBrightness = 0.3 + 0.7 * mixT + sliderImpulse * 0.5;
     const brightness = Math.max(minLuma, baseBrightness);
     
+    // Reusable color object to avoid allocations in tight loop
+    const color = {r: 0, g: 0, b: 0};
+    
     for (let z = 0; z < historyLength; z++) {
       const historyIndex = z;
       const freqData = historyBuffer[historyIndex];
@@ -3007,8 +3026,8 @@ setTimeout(() => {
         // Update Y position (height) with amplitude boost
         positions.setY(vertexIndex, energy * amp);
         
-        // Update color (Step 3: pass rawMix and vocalBeat for split control)
-        let color = getSpectrogramColor(energy, rawMix, vocalBeat);
+        // Update color (Step 3: pass rawMix and vocalBeat for split control) - reuse color object
+        getSpectrogramColor(energy, rawMix, vocalBeat, color);
         
         // Step 4: Apply golden/white flash sweep during reward (no rainbow)
         if (isRewardActive) {
@@ -3017,7 +3036,7 @@ setTimeout(() => {
           // Use x position to create horizontal sweep
           const sweepPos = (x / freqBins) + (rewardProgress * 1.2) - 0.1;
           const sweepT = Math.max(0, Math.min(1, sweepPos));
-          const rewardColor = getRewardColor(sweepT);
+          const rewardColor = getRewardColor(sweepT); // Returns {r,g,b} object, no allocation
           
           // Blend between normal color and golden flash based on sweep position
           const sweepIntensity = Math.exp(-Math.pow((sweepPos - 0.5) * 4, 2)); // Gaussian falloff
@@ -3063,51 +3082,34 @@ setTimeout(() => {
   function animate() {
     requestAnimationFrame(animate);
     
-    // Smoothly transition camera to target angle
-    if (!useOrbitControls) {
-      // Only transition if we're actually transitioning between angles
-      if (isTransitioning) {
-        // Smoothly move camera position
-        currentCameraPos.lerp(targetCameraPos, 0.05);
-        
-        // Check if we've reached the target (stop transitioning when close enough)
-        const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
-        if (distanceToTarget < 0.1) {
-          currentCameraPos.copy(targetCameraPos); // Snap to exact target
-          isTransitioning = false;
-        }
-      } else {
-        // When not transitioning, ensure camera stays at target position
-        currentCameraPos.copy(targetCameraPos);
-      }
-      
-      // Enforce minimum distance from center during transitions to prevent clipping
-      const center = new THREE.Vector3(0, 0, 0);
-      const distance = currentCameraPos.distanceTo(center);
-      const minDistance = 40; // Minimum distance to prevent camera from getting too close
-      
-      if (distance < minDistance) {
-        // Push camera away while maintaining direction
-        const direction = currentCameraPos.clone().normalize();
-        currentCameraPos.copy(direction.multiplyScalar(minDistance));
-      }
+    // Orbit controls are always enabled - let them handle camera
+    if (controls && controls.enabled) {
+      controls.update();
       
       // Step 5: Apply reward camera zoom (move camera closer during reward)
       if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
-        const direction = currentCameraPos.clone().normalize();
+        const center = new THREE.Vector3(0, 0, 0);
+        const currentDistance = camera.position.distanceTo(center);
         const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
-        // Ensure zoomed distance never goes below minimum
+        const minDistance = 15; // Match OrbitControls minDistance
         const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
-        const zoomedPos = direction.multiplyScalar(safeZoomedDistance);
-        camera.position.copy(zoomedPos);
-      } else {
-        camera.position.copy(currentCameraPos);
+        
+        if (currentDistance !== safeZoomedDistance) {
+          const direction = camera.position.clone().sub(controls.target).normalize();
+          const zoomedPos = controls.target.clone().add(direction.multiplyScalar(safeZoomedDistance));
+          camera.position.copy(zoomedPos);
+        }
       }
-      
-      // Always look at the center
-      const angle = cameraAngles[currentAngle];
-      if (angle) {
-        camera.lookAt(angle.target.x, angle.target.y, angle.target.z);
+    } else {
+      // Fallback: smooth transition if controls somehow disabled
+      if (isTransitioning) {
+        currentCameraPos.lerp(targetCameraPos, 0.05);
+        const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
+        if (distanceToTarget < 0.1) {
+          currentCameraPos.copy(targetCameraPos);
+          isTransitioning = false;
+        }
+        camera.position.copy(currentCameraPos);
       }
     }
     
@@ -3121,9 +3123,6 @@ setTimeout(() => {
     
     updateImpulse();
     updateTerrain();
-    if (controls && controls.enabled) {
-      controls.update();
-    }
     // Ensure transparency is maintained each frame
     renderer.setClearColor(0x000000, 0);
     renderer.render(scene, camera);
