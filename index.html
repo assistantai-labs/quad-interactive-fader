@@ -19,14 +19,17 @@
     }
 
     html, body {
-      height: 100%;
+      height: auto;
+      min-height: 100%;
       width: 100%;
       max-width: 100%;
       margin: 0;
       padding: 0;
       background: transparent;
-      overflow: hidden; /* Prevent all scrolling on frame */
-      position: fixed; /* Lock position to prevent scrolling */
+      overflow-x: hidden; /* Prevent horizontal scrolling */
+      overflow-y: auto; /* Allow vertical scrolling */
+      overscroll-behavior-x: none; /* Prevent horizontal overscroll from affecting parent */
+      overscroll-behavior-y: auto; /* Allow vertical overscroll to pass to parent */
     }
 
     body {
@@ -36,16 +39,39 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
-      touch-action: none; /* Prevent all touch gestures that could cause scrolling */
-      overflow: hidden;
-      position: fixed;
+      touch-action: pan-y pinch-zoom; /* Allow vertical panning, prevent horizontal */
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    
+    /* Wrapper to clamp horizontal overflow and prevent horizontal scroll */
+    .iframe-wrapper {
       width: 100%;
-      height: 100%;
+      overflow-x: hidden;
+      overscroll-behavior-x: none;
+      position: relative;
+    }
+    
+    /* Transparent overlay to intercept scroll gestures when needed */
+    .scroll-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none; /* Default: allow iframe interactions */
+      z-index: 10000;
+      background: transparent;
+      touch-action: pan-y; /* Allow vertical scrolling when active */
+    }
+    
+    .scroll-overlay.active {
+      pointer-events: auto; /* Intercept touches for parent page scrolling */
     }
 
     .stage {
       min-height: 100vh;
-      height: 100vh;
+      height: auto;
       width: 100%;
       max-width: 100%;
       display: flex;
@@ -57,7 +83,8 @@
       background: transparent;
       position: relative;
       gap: 20px;
-      overflow: hidden; /* Prevent all scrolling */
+      overflow-x: hidden; /* Prevent horizontal scrolling */
+      overflow-y: visible; /* Allow content to flow vertically */
     }
 
     .profileBadge {
@@ -208,7 +235,7 @@
       position: relative;
       overflow: visible; /* allow FX beyond bounds */
       flex-shrink: 1; /* Allow panel to shrink on mobile */
-      touch-action: none; /* Prevent touch scrolling gestures */
+      touch-action: pan-x pinch-zoom; /* Allow horizontal pan for sliders, prevent vertical scroll on panel */
     }
 
     /* Panel-wide FX overlay so explosions never clip */
@@ -372,26 +399,30 @@
 
     @media (max-width: 520px){
       html, body {
-        overflow: hidden !important;
-        position: fixed !important;
+        overflow-x: hidden !important; /* Prevent horizontal scroll */
+        overflow-y: auto !important; /* Allow vertical scroll */
         width: 100% !important;
-        height: 100% !important;
+        height: auto !important;
+        min-height: 100vh !important;
       }
       
       .stage {
         padding: 4px 8px 4px;
         gap: 6px;
-        min-height: 100vh;
-        height: 100vh;
-        max-height: 100vh;
+        min-height: 100vh; /* Minimum height, but can grow */
+        height: auto;
         justify-content: flex-start;
         padding-top: max(4px, env(safe-area-inset-top));
         padding-bottom: max(4px, env(safe-area-inset-bottom));
-        overflow: hidden !important; /* Prevent all scrolling */
+        overflow-x: hidden; /* Prevent horizontal scrolling */
+        overflow-y: visible; /* Allow content to flow */
         position: relative;
+        box-sizing: border-box;
+        flex-shrink: 0;
+        flex-grow: 0;
       }
       
-      /* EXACT HEIGHTS FOR MOBILE:
+      /* EXACT HEIGHTS FOR MOBILE - FIXED, NO EXTENSION:
        * Total viewport: 100vh
        * Stage padding top: 4px + safe area
        * Stage padding bottom: 4px + safe area  
@@ -403,9 +434,9 @@
       .viz3d {
         width: 100%;
         max-width: 100%;
-        height: 28vh; /* EXACT: 28% of viewport height */
-        min-height: 180px;
-        max-height: 200px;
+        height: 28vh !important; /* EXACT: 28% of viewport height - fixed */
+        min-height: 28vh !important;
+        max-height: 28vh !important;
         margin: 0;
         flex-shrink: 0;
         display: block !important;
@@ -415,6 +446,7 @@
         position: relative;
         order: -1; /* Force visualizer above panel */
         overflow: hidden;
+        box-sizing: border-box;
       }
       
       .panel {
@@ -423,32 +455,33 @@
         margin: 0 8px; /* Visual padding on left and right */
         padding: 12px 10px 16px; /* Restored visual padding: 12px top, 10px sides, 16px bottom */
         border-radius: 16px;
-        height: calc(100vh - 28vh - 6px - 8px); /* EXACT fixed height - does not extend */
-        max-height: calc(100vh - 28vh - 6px - 8px); /* Prevent extension */
-        min-height: calc(100vh - 28vh - 6px - 8px); /* Prevent shrinking */
-        display: flex;
-        flex-direction: column;
-        overflow: hidden !important; /* Prevent panel from overflowing */
+        min-height: calc(100vh - 28vh - 6px - 16px); /* Minimum height for proper layout */
+        height: auto; /* Allow content to determine height */
+        display: flex !important;
+        flex-direction: column !important;
+        overflow-x: hidden; /* Prevent horizontal overflow */
+        overflow-y: visible; /* Allow vertical content flow */
         order: 1; /* Force panel below visualizer */
         position: relative;
-        flex-shrink: 0; /* Never shrink */
-        flex-grow: 0; /* Never grow */
+        flex-shrink: 0 !important; /* Never shrink */
+        flex-grow: 0 !important; /* Never grow */
         box-sizing: border-box;
       }
       
       .rows {
-        flex: 0 0 auto; /* Fixed size - do not grow or shrink */
+        flex: 0 0 auto !important; /* Fixed size - do not grow or shrink */
         min-height: auto;
         max-height: none;
         display: flex;
         flex-direction: column;
         gap: 3px;
-        overflow: visible;
+        overflow: hidden !important; /* Prevent overflow */
         flex-shrink: 0;
+        box-sizing: border-box;
       }
       
       .controls {
-        padding-top: 16px; /* Fixed exact distance from rows above */
+        padding-top: 16px !important; /* Fixed exact distance from rows above */
         padding-bottom: 0;
         margin-bottom: 0;
         flex-shrink: 0;
@@ -473,12 +506,14 @@
 </head>
 
 <body>
-  <div class="rewardWave" id="rewardWave"></div>
-  <div class="stage">
+  <div class="iframe-wrapper">
+    <div class="scroll-overlay" id="scrollOverlay"></div>
+    <div class="rewardWave" id="rewardWave"></div>
+    <div class="stage">
     <div class="viz3d" id="viz3d">
       <div class="viz3dControls">
-        <button class="viz3dAngleBtn" data-angle="1">1</button>
-        <button class="viz3dAngleBtn active" data-angle="2">2</button>
+        <button class="viz3dAngleBtn active" data-angle="1">1</button>
+        <button class="viz3dAngleBtn" data-angle="2">2</button>
         <button class="viz3dAngleBtn" data-angle="3">3</button>
       </div>
     </div>
@@ -522,6 +557,7 @@
     </div>
     <canvas id="viz" class="viz"></canvas>
   </div>
+  </div> <!-- End iframe-wrapper -->
 
 <script>
 /* =========================
@@ -2392,31 +2428,35 @@ setTimeout(() => {
   
   // Define three camera angles (zoomed out by 65%)
   const cameraAngles = {
-    1: { position: { x: 49.5, y: 41.25, z: 49.5 }, target: { x: 0, y: 0, z: 0 } }, // Angled view (right-front corner)
-    2: { position: { x: 66, y: 33, z: 0 }, target: { x: 0, y: 0, z: 0 } }, // Side view
+    1: { position: { x: 66, y: 33, z: 0 }, target: { x: 0, y: 0, z: 0 } }, // Side view (swapped from angle 2)
+    2: { position: { x: 49.5, y: 41.25, z: -49.5 }, target: { x: 0, y: 0, z: 0 } }, // Angled view (swapped from angle 1)
     3: { position: { x: 0, y: 24.75, z: -66 }, target: { x: 0, y: 0, z: 0 } } // Back view
   };
   
-  let currentAngle = 2;
+  let currentAngle = 1;
   let targetCameraPos = new THREE.Vector3();
   let currentCameraPos = new THREE.Vector3();
+  let isTransitioning = false;
   
-  // Initialize camera to angle 2
+  // Initialize camera to angle 1
   function setCameraAngle(angleNum) {
     currentAngle = angleNum;
     const angle = cameraAngles[angleNum];
     if (angle) {
       targetCameraPos.set(angle.position.x, angle.position.y, angle.position.z);
-      // Immediately update current position for smooth transition
-      currentCameraPos.copy(camera.position);
+      // Only transition if the target is different from current position
+      const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
+      isTransitioning = distanceToTarget > 0.1; // Only transition if more than 0.1 units away
     }
   }
   
-  setCameraAngle(2);
-  // Initialize to angle 2 (side view)
-  camera.position.set(cameraAngles[2].position.x, cameraAngles[2].position.y, cameraAngles[2].position.z);
-  camera.lookAt(cameraAngles[2].target.x, cameraAngles[2].target.y, cameraAngles[2].target.z);
+  setCameraAngle(1);
+  // Initialize to angle 1 (side view) - set both positions to the same to prevent movement
+  camera.position.set(cameraAngles[1].position.x, cameraAngles[1].position.y, cameraAngles[1].position.z);
+  camera.lookAt(cameraAngles[1].target.x, cameraAngles[1].target.y, cameraAngles[1].target.z);
   currentCameraPos.copy(camera.position);
+  targetCameraPos.copy(camera.position); // Set target to match current so no transition happens
+  isTransitioning = false;
   
   const renderer = new THREE.WebGLRenderer({ 
     antialias: true, 
@@ -2514,11 +2554,13 @@ setTimeout(() => {
   // Rotate to lay flat (X-Z plane, Y up)
   geometry.rotateX(-Math.PI / 2);
   
-  // Initialize vertex colors
+  // Initialize vertex colors to grey (matching default RAW+VOCALS state)
+  // This prevents the black → grey transition when audio starts
   const colors = [];
   const vertexCount = geometry.attributes.position.count;
+  const initialGrey = 0.18; // Match the grey value from RAW+VOCALS state
   for (let i = 0; i < vertexCount; i++) {
-    colors.push(0, 0, 0); // Start black
+    colors.push(initialGrey, initialGrey, initialGrey); // Start grey instead of black
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   
@@ -2779,12 +2821,53 @@ setTimeout(() => {
   
   // Step 8: Update terrain with audio data
   function updateTerrain() {
-    if (!audio.analyser || !audio.dataArray || !audio.ctx) return;
-    
-    // Get slider values (single source of truth)
+    // Get slider values (single source of truth) - always available
     const rawMix = getRawMix();
     const vocalBeat = getVocalBeat();
     const now = performance.now();
+    
+    // If audio isn't ready yet, still update colors based on slider state
+    // This prevents the black → grey transition when audio starts
+    if (!audio.analyser || !audio.dataArray || !audio.ctx) {
+      // Update colors only (no geometry changes) to match current slider state
+      const positions = geometry.attributes.position;
+      const colors = geometry.attributes.color;
+      
+      for (let z = 0; z < historyLength; z++) {
+        for (let x = 0; x < freqBins; x++) {
+          const vertexIndex = z * freqBins + x;
+          const energy = 0; // No audio data yet, so energy is 0
+          
+          // Ensure vertex stays at Y=0 (flat) - no geometry movement before audio starts
+          positions.setY(vertexIndex, 0);
+          
+          // Get color based on current slider state (RAW+VOCALS = grey)
+          let color = getSpectrogramColor(energy, rawMix, vocalBeat);
+          
+          // Apply minimum brightness floor to prevent pure black
+          const gloomFactor = (1 - rawMix) * (1 - vocalBeat);
+          const minLuma = 0.06 + (0.18 - 0.06) * gloomFactor;
+          const brightness = Math.max(minLuma, Math.sqrt(color.r * color.r * 0.299 + color.g * color.g * 0.587 + color.b * color.b * 0.114));
+          
+          if (brightness > 0.001) {
+            const scale = brightness / Math.max(0.001, Math.sqrt(color.r * color.r * 0.299 + color.g * color.g * 0.587 + color.b * color.b * 0.114));
+            color.r = Math.max(minLuma / 3, color.r * scale);
+            color.g = Math.max(minLuma / 3, color.g * scale);
+            color.b = Math.max(minLuma / 3, color.b * scale);
+          } else {
+            color.r = minLuma / 3;
+            color.g = minLuma / 3;
+            color.b = minLuma / 3;
+          }
+          
+          colors.setXYZ(vertexIndex, color.r, color.g, color.b);
+        }
+      }
+      colors.needsUpdate = true;
+      positions.needsUpdate = true;
+      geometry.computeVertexNormals();
+      return;
+    }
     
     // Step 4: Check for reward effect
     const isRewardActive = checkRewardEffect(rawMix, vocalBeat, now);
@@ -2908,14 +2991,40 @@ setTimeout(() => {
     
     // Smoothly transition camera to target angle
     if (!useOrbitControls) {
-      // Smoothly move camera position
-      currentCameraPos.lerp(targetCameraPos, 0.05);
+      // Only transition if we're actually transitioning between angles
+      if (isTransitioning) {
+        // Smoothly move camera position
+        currentCameraPos.lerp(targetCameraPos, 0.05);
+        
+        // Check if we've reached the target (stop transitioning when close enough)
+        const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
+        if (distanceToTarget < 0.1) {
+          currentCameraPos.copy(targetCameraPos); // Snap to exact target
+          isTransitioning = false;
+        }
+      } else {
+        // When not transitioning, ensure camera stays at target position
+        currentCameraPos.copy(targetCameraPos);
+      }
+      
+      // Enforce minimum distance from center during transitions to prevent clipping
+      const center = new THREE.Vector3(0, 0, 0);
+      const distance = currentCameraPos.distanceTo(center);
+      const minDistance = 40; // Minimum distance to prevent camera from getting too close
+      
+      if (distance < minDistance) {
+        // Push camera away while maintaining direction
+        const direction = currentCameraPos.clone().normalize();
+        currentCameraPos.copy(direction.multiplyScalar(minDistance));
+      }
       
       // Step 5: Apply reward camera zoom (move camera closer during reward)
       if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
         const direction = currentCameraPos.clone().normalize();
         const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
-        const zoomedPos = direction.multiplyScalar(zoomedDistance);
+        // Ensure zoomed distance never goes below minimum
+        const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
+        const zoomedPos = direction.multiplyScalar(safeZoomedDistance);
         camera.position.copy(zoomedPos);
       } else {
         camera.position.copy(currentCameraPos);
@@ -2973,62 +3082,157 @@ setTimeout(() => {
   console.log('3D Spectrogram visualizer initialized');
 }, 100); // Wait 100ms for DOM to be fully ready
 
-// Prevent all scrolling within the iframe - frame should not be scrollable
-// Only allow slider interactions, no page scrolling
+// Smart scroll handling: allow parent page vertical scroll, prevent horizontal scroll
+// Only intercept when detecting vertical scroll intent
 let isDraggingSlider = false;
 let touchStartY = 0;
 let touchStartX = 0;
+let touchStartTime = 0;
+let isVerticalScrollIntent = false;
+let scrollOverlay = null;
+
+// Initialize scroll overlay
+document.addEventListener('DOMContentLoaded', () => {
+  scrollOverlay = document.getElementById('scrollOverlay');
+});
+
+// Check if target is an interactive element (slider, button, etc.)
+function isInteractiveElement(target) {
+  if (!target) return false;
+  
+  // Check if it's a slider element
+  const trackWrap = target.closest('.trackWrap');
+  if (trackWrap) return true;
+  
+  // Check if it's a button
+  if (target.closest('button') || target.tagName === 'BUTTON') return true;
+  
+  // Check if it's the play button
+  if (target.id === 'btnPlay' || target.closest('#btnPlay')) return true;
+  
+  // Check if it's a camera angle button
+  if (target.closest('.viz3dAngleBtn')) return true;
+  
+  return false;
+}
 
 document.addEventListener("touchstart", (e) => {
   const target = e.target;
-  // Check if touch started on a slider element
-  if (panelEl && panelEl.contains(target)) {
-    const trackWrap = target.closest('.trackWrap');
-    if (trackWrap) {
-      // Touch started on slider - track initial position
-      touchStartY = e.touches[0].clientY;
-      touchStartX = e.touches[0].clientX;
-      isDraggingSlider = false; // Will be set to true if horizontal movement detected
+  
+  // Reset scroll intent detection
+  isVerticalScrollIntent = false;
+  
+  // If touching an interactive element, keep overlay inactive
+  if (isInteractiveElement(target)) {
+    if (scrollOverlay) scrollOverlay.classList.remove('active');
+    
+    // Track initial position for slider drag detection
+    if (panelEl && panelEl.contains(target)) {
+      const trackWrap = target.closest('.trackWrap');
+      if (trackWrap && e.touches.length > 0) {
+        touchStartY = e.touches[0].clientY;
+        touchStartX = e.touches[0].clientX;
+        touchStartTime = performance.now();
+        isDraggingSlider = false;
+      }
     }
+    return; // Don't activate overlay for interactive elements
   }
+  
+  // Track touch start for scroll intent detection
+  if (e.touches.length > 0) {
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+    touchStartTime = performance.now();
+  }
+  
+  // Initially keep overlay inactive (pointer-events: none)
+  if (scrollOverlay) scrollOverlay.classList.remove('active');
 }, { passive: true });
 
 document.addEventListener("touchmove", (e) => {
   const target = e.target;
   
-  // Prevent all scrolling - frame should not scroll
-  // Only allow slider dragging
-  if (firstGestureDone && panelEl && panelEl.contains(target)) {
-    const trackWrap = target.closest('.trackWrap');
-    if (trackWrap && e.touches.length > 0) {
-      const touch = e.touches[0];
-      const deltaY = Math.abs(touch.clientY - touchStartY);
-      const deltaX = Math.abs(touch.clientX - touchStartX);
-      
-      // If horizontal movement is greater than vertical, it's a slider drag - allow it
-      if (deltaX > 10 && deltaX > deltaY * 1.5) {
-        isDraggingSlider = true;
-        e.preventDefault(); // Prevent scroll during slider drag
-      } else if (isDraggingSlider && deltaX > 5) {
-        // Continue preventing scroll while dragging
-        e.preventDefault();
-      } else {
-        // Prevent all other scrolling within frame
-        e.preventDefault();
+  // If user is interacting with slider/button, keep overlay inactive
+  if (isInteractiveElement(target)) {
+    if (scrollOverlay) scrollOverlay.classList.remove('active');
+    
+    // Handle slider drag detection
+    if (panelEl && panelEl.contains(target)) {
+      const trackWrap = target.closest('.trackWrap');
+      if (trackWrap && e.touches.length > 0) {
+        const touch = e.touches[0];
+        const deltaY = Math.abs(touch.clientY - touchStartY);
+        const deltaX = Math.abs(touch.clientX - touchStartX);
+        
+        // If horizontal movement is greater than vertical, it's a slider drag
+        if (deltaX > 10 && deltaX > deltaY * 1.5) {
+          isDraggingSlider = true;
+          e.preventDefault(); // Prevent scroll during horizontal slider drag
+        } else if (isDraggingSlider && deltaX > 5) {
+          // Continue preventing scroll while dragging horizontally
+          e.preventDefault();
+        }
+        // For vertical movement or no clear direction, allow parent scroll (don't preventDefault)
       }
-    } else {
-      // Prevent scrolling anywhere else in the frame
-      e.preventDefault();
     }
-  } else {
-    // Prevent scrolling outside panel area too
+    return;
+  }
+  
+  // For non-interactive elements, detect scroll intent
+  if (e.touches.length > 0 && touchStartY !== 0 && touchStartX !== 0) {
+    const touch = e.touches[0];
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+    const deltaX = Math.abs(touch.clientX - touchStartX);
+    const deltaTime = performance.now() - touchStartTime;
+    
+    // Detect vertical scroll intent: vertical movement > horizontal, and significant
+    const VERTICAL_THRESHOLD = 10; // Minimum pixels to detect vertical scroll
+    const HORIZONTAL_THRESHOLD = 15; // Maximum horizontal movement to still be "vertical scroll"
+    
+    if (deltaY > VERTICAL_THRESHOLD && deltaY > deltaX * 1.5 && deltaX < HORIZONTAL_THRESHOLD) {
+      // Vertical scroll detected - activate overlay to allow parent page scroll
+      isVerticalScrollIntent = true;
+      if (scrollOverlay) scrollOverlay.classList.add('active');
+      // Don't preventDefault - let the scroll event bubble to parent
+    } else if (deltaX > HORIZONTAL_THRESHOLD && deltaX > deltaY * 1.5) {
+      // Horizontal movement detected - prevent horizontal scroll
+      isVerticalScrollIntent = false;
+      if (scrollOverlay) scrollOverlay.classList.remove('active');
+      e.preventDefault(); // Prevent horizontal scrolling
+    } else {
+      // Ambiguous movement - keep overlay inactive initially
+      if (scrollOverlay) scrollOverlay.classList.remove('active');
+    }
+  }
+}, { passive: false }); // non-passive to allow preventDefault for horizontal scrolls
+
+document.addEventListener("touchend", (e) => {
+  // Reset states
+  isDraggingSlider = false;
+  isVerticalScrollIntent = false;
+  touchStartY = 0;
+  touchStartX = 0;
+  touchStartTime = 0;
+  
+  // Deactivate overlay after a short delay (allows final scroll momentum)
+  if (scrollOverlay) {
+    setTimeout(() => {
+      scrollOverlay.classList.remove('active');
+    }, 100);
+  }
+}, { passive: true });
+
+// Also handle mouse wheel for desktop - allow vertical scroll, prevent horizontal
+document.addEventListener("wheel", (e) => {
+  // Allow vertical scrolling (deltaY)
+  // Only prevent horizontal scrolling (deltaX)
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+    // Horizontal scroll attempt - prevent it
     e.preventDefault();
   }
+  // Vertical scroll - allow it to pass through
 }, { passive: false });
-
-document.addEventListener("touchend", () => {
-  isDraggingSlider = false;
-}, { passive: true });
 
 updatePlayButton();
 
