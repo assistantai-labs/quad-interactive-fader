@@ -542,7 +542,6 @@
             <button class="viz3dAngleBtn active" data-angle="1">1</button>
             <button class="viz3dAngleBtn" data-angle="2">2</button>
             <button class="viz3dAngleBtn" data-angle="3">3</button>
-            <button class="viz3dAngleBtn" id="btnOrbit" data-orbit="free">FREE</button>
           </div>
         </div>
       </div>
@@ -2454,15 +2453,43 @@ setTimeout(() => {
   let currentCameraPos = new THREE.Vector3();
   let isTransitioning = false;
   
+  // Smooth transition state
+  let transitionStartTime = 0;
+  let transitionDuration = 600; // 600ms for quick, smooth transitions
+  let transitionStartPos = new THREE.Vector3();
+  let transitionStartTarget = new THREE.Vector3();
+  let transitionTargetPos = new THREE.Vector3();
+  let transitionTargetLookAt = new THREE.Vector3();
+  
+  // Smooth easing function (ease-in-out quad) for gentle, natural movement
+  function easeInOutQuad(t) {
+    return t < 0.5 
+      ? 2 * t * t 
+      : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+  
   // Initialize camera to angle 1
   function setCameraAngle(angleNum) {
     currentAngle = angleNum;
     const angle = cameraAngles[angleNum];
     if (angle) {
-      targetCameraPos.set(angle.position.x, angle.position.y, angle.position.z);
-      // Only transition if the target is different from current position
-      const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
-      isTransitioning = distanceToTarget > 0.1; // Only transition if more than 0.1 units away
+      transitionTargetPos.set(angle.position.x, angle.position.y, angle.position.z);
+      transitionTargetLookAt.set(angle.target.x, angle.target.y, angle.target.z);
+      
+      // Store starting positions for smooth interpolation
+      // Use currentCameraPos which should be updated before calling this
+      transitionStartPos.copy(currentCameraPos);
+      
+      // Calculate current look-at point from camera's current state
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      direction.multiplyScalar(-1);
+      const currentLookAtPoint = camera.position.clone().add(direction);
+      transitionStartTarget.copy(currentLookAtPoint);
+      
+      // Start transition
+      transitionStartTime = performance.now();
+      isTransitioning = true;
     }
   }
   
@@ -2517,12 +2544,16 @@ setTimeout(() => {
   
   // Also sync visualizer width with panel width dynamically
   if (panelEl) {
+    const MIN_WIDTH = 300; // Minimum visualizer width in pixels
+    const MAX_WIDTH = 1200; // Maximum visualizer width in pixels
+    
     const syncVisualizerWidth = () => {
       const panelRect = panelEl.getBoundingClientRect();
       const panelWidth = panelRect.width;
       
-      // Make visualizer 40% smaller (60% of panel width)
-      viz3dContainer.style.width = (panelWidth * 0.6) + 'px';
+      // Match panel width exactly, but clamp to min/max
+      const clampedWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, panelWidth));
+      viz3dContainer.style.width = clampedWidth + 'px';
       
       // Update renderer size after width change
       updateRendererSize();
@@ -2575,29 +2606,23 @@ setTimeout(() => {
     console.warn('Failed to create OrbitControls:', e);
   }
   
-  // Set up angle selection buttons (snap to preset angles, then allow free dragging)
+  // Set up angle selection buttons with smooth transitions
   const angleButtons = viz3dContainer.querySelectorAll('.viz3dAngleBtn[data-angle]');
   
   angleButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const angleNum = parseInt(btn.dataset.angle);
-      setCameraAngle(angleNum);
       
-      // Snap camera to preset angle, then allow free dragging
+      // Capture current camera position (in case orbit controls moved it)
+      currentCameraPos.copy(camera.position);
+      
+      // Disable orbit controls during transition for smooth preset angle movement
       if (controls) {
-        isTransitioning = false; // Stop any transitions
-        const angle = cameraAngles[angleNum];
-        if (angle) {
-          camera.position.set(angle.position.x, angle.position.y, angle.position.z);
-          camera.lookAt(angle.target.x, angle.target.y, angle.target.z);
-          controls.target.set(angle.target.x, angle.target.y, angle.target.z);
-          // Update internal tracking
-          currentCameraPos.copy(camera.position);
-          targetCameraPos.copy(camera.position);
-        }
-        // Keep orbit controls enabled so user can drag after snapping
-        controls.enabled = true;
+        controls.enabled = false;
       }
+      
+      // Start smooth transition to new angle (setCameraAngle handles transition setup)
+      setCameraAngle(angleNum);
       
       // Update button states
       angleButtons.forEach(b => b.classList.remove('active'));
@@ -3082,34 +3107,93 @@ setTimeout(() => {
   function animate() {
     requestAnimationFrame(animate);
     
-    // Orbit controls are always enabled - let them handle camera
-    if (controls && controls.enabled) {
-      controls.update();
+    // Handle smooth transitions between preset angles with time-based easing
+    if (isTransitioning) {
+      const now = performance.now();
+      const elapsed = now - transitionStartTime;
+      const progress = Math.min(1, elapsed / transitionDuration);
       
-      // Step 5: Apply reward camera zoom (move camera closer during reward)
-      if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
-        const center = new THREE.Vector3(0, 0, 0);
-        const currentDistance = camera.position.distanceTo(center);
-        const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
-        const minDistance = 15; // Match OrbitControls minDistance
-        const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
-        
-        if (currentDistance !== safeZoomedDistance) {
-          const direction = camera.position.clone().sub(controls.target).normalize();
-          const zoomedPos = controls.target.clone().add(direction.multiplyScalar(safeZoomedDistance));
-          camera.position.copy(zoomedPos);
-        }
-      }
-    } else {
-      // Fallback: smooth transition if controls somehow disabled
-      if (isTransitioning) {
-        currentCameraPos.lerp(targetCameraPos, 0.05);
-        const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
-        if (distanceToTarget < 0.1) {
-          currentCameraPos.copy(targetCameraPos);
-          isTransitioning = false;
-        }
+      if (progress >= 1) {
+        // Transition complete - snap to exact target
+        currentCameraPos.copy(transitionTargetPos);
         camera.position.copy(currentCameraPos);
+        camera.lookAt(transitionTargetLookAt);
+        isTransitioning = false;
+        
+        // Update tracking vectors
+        targetCameraPos.copy(transitionTargetPos);
+        
+        // Re-enable orbit controls after transition completes
+        if (controls) {
+          controls.enabled = true;
+          controls.target.copy(transitionTargetLookAt);
+          controls.update();
+        }
+      } else {
+        // Apply smooth easing (ease-in-out quad for gentle movement)
+        const easedProgress = easeInOutQuad(progress);
+        
+        // Interpolate camera position directly - smooth linear path
+        currentCameraPos.lerpVectors(transitionStartPos, transitionTargetPos, easedProgress);
+        
+        // Interpolate look-at target smoothly
+        const currentLookAt = new THREE.Vector3();
+        currentLookAt.lerpVectors(transitionStartTarget, transitionTargetLookAt, easedProgress);
+        
+        // Ensure camera maintains reasonable distance during transition
+        // This prevents the camera from going out of frame
+        const center = new THREE.Vector3(0, 0, 0);
+        const distance = currentCameraPos.distanceTo(center);
+        const minDistance = 40;
+        const maxDistance = 90; // Prevent camera from going too far out
+        
+        // Clamp distance to reasonable range to keep camera in frame
+        if (distance < minDistance) {
+          const direction = currentCameraPos.clone().normalize();
+          currentCameraPos.copy(direction.multiplyScalar(minDistance));
+        } else if (distance > maxDistance) {
+          const direction = currentCameraPos.clone().normalize();
+          currentCameraPos.copy(direction.multiplyScalar(maxDistance));
+        }
+        
+        // Apply camera position and look-at
+        camera.position.copy(currentCameraPos);
+        camera.lookAt(currentLookAt);
+      }
+      
+      // Step 5: Apply reward camera zoom (only if not transitioning)
+      // Skip reward zoom during transitions to avoid conflicts
+    } else {
+      // No transition: orbit controls handle camera movement
+      if (controls && controls.enabled) {
+        controls.update();
+        
+        // Sync currentCameraPos with actual camera position when using orbit controls
+        // This ensures transitions start from the correct position
+        currentCameraPos.copy(camera.position);
+        
+        // Step 5: Apply reward camera zoom (move camera closer during reward)
+        if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
+          const center = new THREE.Vector3(0, 0, 0);
+          const currentDistance = camera.position.distanceTo(center);
+          const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
+          const minDistance = 15; // Match OrbitControls minDistance
+          const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
+          
+          if (currentDistance !== safeZoomedDistance) {
+            const direction = camera.position.clone().sub(controls.target).normalize();
+            const zoomedPos = controls.target.clone().add(direction.multiplyScalar(safeZoomedDistance));
+            camera.position.copy(zoomedPos);
+            currentCameraPos.copy(camera.position);
+          }
+        }
+      } else {
+        // Fallback: ensure camera stays at target position
+        camera.position.copy(currentCameraPos);
+        const angle = cameraAngles[currentAngle];
+        if (angle) {
+          camera.lookAt(angle.target.x, angle.target.y, angle.target.z);
+        }
       }
     }
     
