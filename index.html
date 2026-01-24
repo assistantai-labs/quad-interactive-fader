@@ -254,16 +254,19 @@
       -webkit-backdrop-filter: blur(14px);
       border: 1px solid rgba(255,255,255,0.10);
       box-shadow: 0 18px 50px rgba(0,0,0,0.55);
-      padding: 26px 26px 32px;
+      padding: 14px 26px 14px; /* Very tight vertical padding */
       box-sizing: border-box;
       color: #fff;
       position: relative;
-      overflow: hidden; /* Prevent scrolling on panel */
+      overflow: visible; /* Allow knobs to extend beyond panel bounds */
       height: fit-content !important;
       min-height: 0 !important;
       max-height: none !important;
       touch-action: pan-x pinch-zoom; /* Allow horizontal pan for sliders, prevent vertical scroll on panel */
       overscroll-behavior: none; /* Prevent scroll chaining */
+      display: flex;
+      flex-direction: column; /* Enable flex layout for vertical centering */
+      z-index: 1; /* Lower z-index so knobs can appear above */
     }
 
     /* Ensure panel children don't force height */
@@ -287,8 +290,8 @@
       --trackH: 4px;
       --knob: clamp(28px, 4.0vw, 38px);
       --knobPress: 1.40; /* expand 40% on press */
-      --rowGap: clamp(14px, 2.2vw, 18px);
-      --labelGap: 10px;
+      --rowGap: clamp(4px, 1vw, 8px); /* Very tight spacing between rows */
+      --labelGap: 1px; /* Minimal gap - labels will be very close to sliders */
       /* Maximize hitbox: extend into gap between sliders, leaving ~1px buffer to prevent overlap */
       /* Gap is rowGap * 1.2, so each slider can extend by ~(gap/2 - 1px) */
       --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(7.4px, 1.32vw, 9.8px));
@@ -301,11 +304,12 @@
 
     .rows {
       display: grid;
-      gap: calc(var(--rowGap) * 1.2);
+      gap: var(--rowGap); /* Use rowGap directly, no multiplier */
       position: relative;
       z-index: 2;
-      flex: 1 1 auto;
+      flex: 0 0 auto; /* Don't grow, just fit content */
       min-height: 0;
+      overflow: visible; /* Allow knobs to extend beyond row bounds */
     }
 
     .row {
@@ -324,6 +328,7 @@
       color: #fff;
       opacity: 0.98;
       padding: 0 2px;
+      margin-bottom: -6px; /* Pull labels down closer to sliders without affecting frame height */
       pointer-events: none;
       position: relative;
       z-index: 2;
@@ -338,7 +343,7 @@
       padding-left: var(--endPad);
       padding-right: var(--endPad);
       box-sizing: border-box;
-      overflow: visible;
+      overflow: visible; /* Allow knob to extend beyond track bounds */
       z-index: 2;
       cursor: pointer; /* Ensure cursor indicates clickability */
     }
@@ -377,7 +382,7 @@
       box-shadow: 0 8px 18px rgba(0,0,0,0.35);
       will-change: transform, left, top, clip-path;
       touch-action: none;
-      z-index: 5;
+      z-index: 100; /* High z-index to appear above glass frame */
       transition: clip-path 0.05s ease-out;
     }
 
@@ -395,12 +400,16 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      padding-top: 20px; /* Fixed distance from rows above */
+      padding-top: 0px; /* Minimal spacing from rows above */
       padding-bottom: 0;
+      margin-top: -10px; /* Negative margin to pull button up further */
+      margin-left: 0;
+      margin-right: 0;
       margin-bottom: 0;
       position: relative;
       z-index: 2;
       flex-shrink: 0; /* Never shrink */
+      width: 100%; /* Ensure full width for centering */
     }
 
     .btn {
@@ -422,6 +431,7 @@
       -webkit-tap-highlight-color: transparent;
       transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
       font-family: inherit;
+      margin: 0 auto; /* Ensure button is centered */
     }
 
     .btn:active {
@@ -469,14 +479,14 @@
         width: calc(100% - 16px);
         max-width: calc(100% - 16px);
         margin: 0 auto;
-        padding: 12px 10px 12px;
+        padding: 10px 10px 10px; /* Very tight vertical padding */
         border-radius: 16px;
         height: fit-content !important;
         min-height: 0 !important;
         max-height: none !important;
         display: flex !important;
         flex-direction: column !important;
-        overflow: hidden !important; /* Prevent all scrolling on panel */
+        overflow: visible !important; /* Allow knobs to extend beyond panel bounds */
         overscroll-behavior: none !important; /* Prevent scroll chaining */
       }
       
@@ -489,13 +499,14 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: 3px;
+        gap: 2px; /* Very tight gap on mobile */
         overflow: visible;
       }
       
       .controls {
-        padding-top: 12px;
+        padding-top: 0px; /* Minimal spacing on mobile */
         padding-bottom: 0;
+        margin-top: -10px !important; /* Negative margin to pull button up further */
         margin-bottom: 0;
         flex-shrink: 0;
         flex-grow: 0;
@@ -2446,14 +2457,15 @@ setTimeout(() => {
   // Define three camera angles (zoomed out by 65%)
   const cameraAngles = {
     1: { position: { x: 66, y: 33, z: 0 }, target: { x: 0, y: 0, z: 0 } }, // Side view (swapped from angle 2)
-    2: { position: { x: 49.5, y: 41.25, z: -49.5 }, target: { x: 0, y: 0, z: 0 } }, // Angled view (swapped from angle 1)
-    3: { position: { x: 0, y: 24.75, z: -66 }, target: { x: 0, y: 0, z: 0 } } // Back view
+    2: { position: { x: 66, y: 80, z: 0 }, target: { x: 0, y: 0, z: 0 } }, // Same angle as 1 but from above (sky shot)
+    3: { position: { x: 49.5, y: 41.25, z: -49.5 }, target: { x: 0, y: 0, z: 0 } } // Angled view (swapped from angle 2)
   };
   
   let currentAngle = 1;
   let targetCameraPos = new THREE.Vector3();
   let currentCameraPos = new THREE.Vector3();
-  let isTransitioning = false;
+  let targetLookAt = new THREE.Vector3();
+  let currentLookAt = new THREE.Vector3();
   
   // Initialize camera to angle 1
   function setCameraAngle(angleNum) {
@@ -2461,19 +2473,18 @@ setTimeout(() => {
     const angle = cameraAngles[angleNum];
     if (angle) {
       targetCameraPos.set(angle.position.x, angle.position.y, angle.position.z);
-      // Only transition if the target is different from current position
-      const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
-      isTransitioning = distanceToTarget > 0.1; // Only transition if more than 0.1 units away
+      targetLookAt.set(angle.target.x, angle.target.y, angle.target.z);
     }
   }
   
   setCameraAngle(1);
-  // Initialize to angle 1 (side view) - set both positions to the same to prevent movement
+  // Initialize to angle 1 (side view)
   camera.position.set(cameraAngles[1].position.x, cameraAngles[1].position.y, cameraAngles[1].position.z);
   camera.lookAt(cameraAngles[1].target.x, cameraAngles[1].target.y, cameraAngles[1].target.z);
   currentCameraPos.copy(camera.position);
-  targetCameraPos.copy(camera.position); // Set target to match current so no transition happens
-  isTransitioning = false;
+  targetCameraPos.copy(camera.position);
+  currentLookAt.set(cameraAngles[1].target.x, cameraAngles[1].target.y, cameraAngles[1].target.z);
+  targetLookAt.set(cameraAngles[1].target.x, cameraAngles[1].target.y, cameraAngles[1].target.z);
   
   const renderer = new THREE.WebGLRenderer({ 
     antialias: true, 
@@ -2587,14 +2598,13 @@ setTimeout(() => {
     btn.addEventListener('click', () => {
       const angleNum = parseInt(btn.dataset.angle);
       
-      // Disable orbit controls during transition for smooth preset angle movement
+      // Disable orbit controls when using preset angles
       if (controls) {
         controls.enabled = false;
       }
       
-      // Start smooth transition to new angle
+      // Set new target angle - camera will smoothly move to it
       setCameraAngle(angleNum);
-      isTransitioning = true;
       
       // Update button states
       angleButtons.forEach(b => b.classList.remove('active'));
@@ -3108,53 +3118,39 @@ setTimeout(() => {
   function animate() {
     requestAnimationFrame(animate);
     
-    // Handle smooth transitions between preset angles
-    if (isTransitioning) {
-      // Smoothly transition camera position
-      currentCameraPos.lerp(targetCameraPos, 0.08); // Slightly faster for smoother feel
+    // Smoothly move camera to target angle (always active, no transition state)
+    if (controls && controls.enabled) {
+      // Orbit controls are active - let them handle camera
+      controls.update();
       
-      // Smoothly transition camera look-at target
-      const angle = cameraAngles[currentAngle];
-      if (angle) {
-        const targetLookAt = new THREE.Vector3(angle.target.x, angle.target.y, angle.target.z);
-        const currentLookAt = new THREE.Vector3();
-        camera.getWorldDirection(currentLookAt);
-        currentLookAt.multiplyScalar(-1).add(camera.position);
+      // Step 5: Apply reward camera zoom (move camera closer during reward)
+      if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
+        const center = new THREE.Vector3(0, 0, 0);
+        const currentDistance = camera.position.distanceTo(center);
+        const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
+        const minDistance = 15; // Match OrbitControls minDistance
+        const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
         
-        // Interpolate look-at target
-        const lerpedLookAt = currentLookAt.lerp(targetLookAt, 0.08);
-        camera.lookAt(lerpedLookAt);
-      }
-      
-      // Check if we've reached the target (stop transitioning when close enough)
-      const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
-      if (distanceToTarget < 0.1) {
-        currentCameraPos.copy(targetCameraPos); // Snap to exact target
-        const angle = cameraAngles[currentAngle];
-        if (angle) {
-          camera.lookAt(angle.target.x, angle.target.y, angle.target.z);
+        if (currentDistance !== safeZoomedDistance) {
+          const direction = camera.position.clone().sub(controls.target).normalize();
+          const zoomedPos = controls.target.clone().add(direction.multiplyScalar(safeZoomedDistance));
+          camera.position.copy(zoomedPos);
         }
-        isTransitioning = false;
-        
-        // Re-enable orbit controls after transition completes
-        if (controls) {
-          controls.enabled = true;
-          // Sync controls target with current camera state
-          controls.target.set(angle.target.x, angle.target.y, angle.target.z);
-          camera.position.copy(currentCameraPos);
-        }
-      } else {
-        // Update camera position during transition
-        camera.position.copy(currentCameraPos);
       }
+    } else {
+      // Smoothly move camera toward target angle
+      currentCameraPos.lerp(targetCameraPos, 0.05); // Smooth lerp to target position
+      currentLookAt.lerp(targetLookAt, 0.05); // Smooth lerp to target look-at
       
-      // Enforce minimum distance from center during transitions to prevent clipping
-      const center = new THREE.Vector3(0, 0, 0);
-      const distance = currentCameraPos.distanceTo(center);
-      const minDistance = 40; // Minimum distance to prevent camera from getting too close
+      // Update camera
+      camera.position.copy(currentCameraPos);
+      camera.lookAt(currentLookAt);
+      
+      // Enforce minimum distance from center to prevent clipping
+      const distance = currentCameraPos.distanceTo(new THREE.Vector3(0, 0, 0));
+      const minDistance = 40;
       
       if (distance < minDistance) {
-        // Push camera away while maintaining direction
         const direction = currentCameraPos.clone().normalize();
         currentCameraPos.copy(direction.multiplyScalar(minDistance));
         camera.position.copy(currentCameraPos);
@@ -3167,33 +3163,6 @@ setTimeout(() => {
         const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
         const zoomedPos = direction.multiplyScalar(safeZoomedDistance);
         camera.position.copy(zoomedPos);
-      }
-    } else {
-      // No transition: orbit controls handle camera movement
-      if (controls && controls.enabled) {
-        controls.update();
-        
-        // Step 5: Apply reward camera zoom (move camera closer during reward)
-        if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
-          const center = new THREE.Vector3(0, 0, 0);
-          const currentDistance = camera.position.distanceTo(center);
-          const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
-          const minDistance = 15; // Match OrbitControls minDistance
-          const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
-          
-          if (currentDistance !== safeZoomedDistance) {
-            const direction = camera.position.clone().sub(controls.target).normalize();
-            const zoomedPos = controls.target.clone().add(direction.multiplyScalar(safeZoomedDistance));
-            camera.position.copy(zoomedPos);
-          }
-        }
-      } else {
-        // Fallback: ensure camera stays at target position
-        camera.position.copy(currentCameraPos);
-        const angle = cameraAngles[currentAngle];
-        if (angle) {
-          camera.lookAt(angle.target.x, angle.target.y, angle.target.z);
-        }
       }
     }
     
