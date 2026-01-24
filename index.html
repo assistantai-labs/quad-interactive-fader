@@ -2637,13 +2637,11 @@ setTimeout(() => {
   // Rotate to lay flat (X-Z plane, Y up)
   geometry.rotateX(-Math.PI / 2);
   
-  // Initialize vertex colors to grey (matching default RAW+VOCALS state)
-  // This prevents the black → grey transition when audio starts
+  // Initialize vertex colors to black (no audio state)
   const colors = [];
   const vertexCount = geometry.attributes.position.count;
-  const initialGrey = 0.18; // Match the grey value from RAW+VOCALS state
   for (let i = 0; i < vertexCount; i++) {
-    colors.push(initialGrey, initialGrey, initialGrey); // Start grey instead of black
+    colors.push(0, 0, 0); // Start black when no audio
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   
@@ -2655,6 +2653,14 @@ setTimeout(() => {
   // Optimized: return {r,g,b} object instead of THREE.Color to avoid allocations
   function getSpectrogramColor(energy, rawMix, vocalBeat, outColor = {r: 0, g: 0, b: 0}) {
     energy = Math.max(0, Math.min(1, energy));
+    
+    // If no energy (no audio), return black
+    if (energy === 0) {
+      outColor.r = 0;
+      outColor.g = 0;
+      outColor.b = 0;
+      return outColor;
+    }
     
     // Base gloom level
     const gray = energy * 0.3;
@@ -2915,44 +2921,21 @@ setTimeout(() => {
     const vocalBeat = getVocalBeat();
     const now = performance.now();
     
-    // If audio isn't ready yet, still update colors based on slider state
-    // This prevents the black → grey transition when audio starts
+    // If audio isn't ready yet, set everything to black (no audio)
     if (!audio.analyser || !audio.dataArray || !audio.ctx) {
-      // Update colors only (no geometry changes) to match current slider state
+      // Update colors only (no geometry changes) - set to black when no audio
       const positions = geometry.attributes.position;
       const colors = geometry.attributes.color;
-      
-      // Reusable color object to avoid allocations
-      const color = {r: 0, g: 0, b: 0};
       
       for (let z = 0; z < historyLength; z++) {
         for (let x = 0; x < freqBins; x++) {
           const vertexIndex = z * freqBins + x;
-          const energy = 0; // No audio data yet, so energy is 0
           
           // Ensure vertex stays at Y=0 (flat) - no geometry movement before audio starts
           positions.setY(vertexIndex, 0);
           
-          // Get color based on current slider state (RAW+VOCALS = grey) - reuse color object
-          getSpectrogramColor(energy, rawMix, vocalBeat, color);
-          
-          // Apply minimum brightness floor to prevent pure black
-          const gloomFactor = (1 - rawMix) * (1 - vocalBeat);
-          const minLuma = 0.06 + (0.18 - 0.06) * gloomFactor;
-          const brightness = Math.max(minLuma, Math.sqrt(color.r * color.r * 0.299 + color.g * color.g * 0.587 + color.b * color.b * 0.114));
-          
-          if (brightness > 0.001) {
-            const scale = brightness / Math.max(0.001, Math.sqrt(color.r * color.r * 0.299 + color.g * color.g * 0.587 + color.b * color.b * 0.114));
-            color.r = Math.max(minLuma / 3, color.r * scale);
-            color.g = Math.max(minLuma / 3, color.g * scale);
-            color.b = Math.max(minLuma / 3, color.b * scale);
-          } else {
-            color.r = minLuma / 3;
-            color.g = minLuma / 3;
-            color.b = minLuma / 3;
-          }
-          
-          colors.setXYZ(vertexIndex, color.r, color.g, color.b);
+          // Set to black when no audio is playing
+          colors.setXYZ(vertexIndex, 0, 0, 0);
         }
       }
       colors.needsUpdate = true;
@@ -2988,12 +2971,40 @@ setTimeout(() => {
     // With 4096 FFT size, we get 2048 frequency bins
     const availableBins = audio.dataArray.length;
     
+    // Non-linear frequency mapping function based on image specs:
+    // EXPAND (low freq, left) -> EXPAND BUT A LITTLE LESS (mid freq, middle) -> SHRINK (high freq, right)
+    function mapVisualToFrequency(visualPos) {
+      // visualPos: 0 (left) to 1 (right) - position in visualizer
+      // Returns: frequency position 0 (low) to 1 (high) - which frequency to sample
+      
+      if (visualPos < 0.5) {
+        // EXPAND region (left half): Expand low frequencies
+        // Map first 50% of visual space to first ~25% of frequencies
+        const t = visualPos / 0.5; // 0 to 1 within left half
+        const expanded = t * t * 0.25; // Quadratic curve, expands low frequencies
+        return expanded;
+      } else if (visualPos < 0.8) {
+        // EXPAND BUT A LITTLE LESS region (middle 30%): Moderate expansion
+        // Map middle 30% of visual space to next ~35% of frequencies
+        const t = (visualPos - 0.5) / 0.3; // 0 to 1 within middle section
+        const expanded = 0.25 + (t * t * 0.35); // Quadratic but less aggressive
+        return expanded;
+      } else {
+        // SHRINK region (right 20%): Compress high frequencies
+        // Map last 20% of visual space to remaining ~40% of frequencies
+        const t = (visualPos - 0.8) / 0.2; // 0 to 1 within right section
+        const compressed = 0.6 + (t * 0.4); // Linear compression for high frequencies
+        return compressed;
+      }
+    }
+    
     for (let i = 0; i < freqBins; i++) {
-      // Map frequency bin to analyser data with better resolution
-      // Use logarithmic-like mapping to emphasize lower frequencies but still show high detail
-      const normalizedPos = i / freqBins;
-      // Map more linearly to capture fine detail across the spectrum
-      const targetHz = normalizedPos * (sampleRate / 2);
+      // Map visual position to frequency using non-linear distribution
+      const visualPos = i / freqBins; // Position in visualizer (0 to 1)
+      const freqPos = mapVisualToFrequency(visualPos); // Mapped frequency position (0 to 1)
+      
+      // Convert frequency position to actual Hz
+      const targetHz = freqPos * (sampleRate / 2);
       const binIndex = Math.floor(targetHz / binHz);
       const rawValue = audio.dataArray[Math.min(binIndex, availableBins - 1)] / 255;
       
@@ -3037,6 +3048,12 @@ setTimeout(() => {
         
         // Update color (Step 3: pass rawMix and vocalBeat for split control) - reuse color object
         getSpectrogramColor(energy, rawMix, vocalBeat, color);
+        
+        // If energy is zero (no audio), keep it black and skip all color processing
+        if (energy === 0) {
+          colors.setXYZ(vertexIndex, 0, 0, 0);
+          continue; // Skip to next vertex
+        }
         
         // Step 4: Apply golden/white flash sweep during reward (no rainbow)
         if (isRewardActive) {
