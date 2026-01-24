@@ -258,11 +258,12 @@
       box-sizing: border-box;
       color: #fff;
       position: relative;
-      overflow: visible; /* allow FX beyond bounds */
+      overflow: hidden; /* Prevent scrolling on panel */
       height: fit-content !important;
       min-height: 0 !important;
       max-height: none !important;
       touch-action: pan-x pinch-zoom; /* Allow horizontal pan for sliders, prevent vertical scroll on panel */
+      overscroll-behavior: none; /* Prevent scroll chaining */
     }
 
     /* Ensure panel children don't force height */
@@ -276,6 +277,7 @@
       inset: -40px;            /* extra room so particles can fly */
       pointer-events: none;
       z-index: 3;              /* above labels so nothing clips it */
+      overflow: visible;       /* Allow particles to extend beyond panel bounds */
     }
 
 
@@ -474,8 +476,8 @@
         max-height: none !important;
         display: flex !important;
         flex-direction: column !important;
-        overflow-x: hidden;
-        overflow-y: visible;
+        overflow: hidden !important; /* Prevent all scrolling on panel */
+        overscroll-behavior: none !important; /* Prevent scroll chaining */
       }
       
       .panel * {
@@ -641,8 +643,8 @@ function buildGraph() {
   // Create master gain and analyser to analyze final output
   audio.masterGain = audio.ctx.createGain();
   audio.analyser = audio.ctx.createAnalyser();
-  audio.analyser.fftSize = 512; // Increased for better frequency resolution in spectrogram
-  audio.analyser.smoothingTimeConstant = 0.3; // Smooth the data
+  audio.analyser.fftSize = 4096; // High resolution like Insight 2 (4096 FFT size)
+  audio.analyser.smoothingTimeConstant = 0.1; // Less smoothing for more detail/granularity
   const bufferLength = audio.analyser.frequencyBinCount;
   audio.dataArray = new Uint8Array(bufferLength);
   
@@ -2453,43 +2455,15 @@ setTimeout(() => {
   let currentCameraPos = new THREE.Vector3();
   let isTransitioning = false;
   
-  // Smooth transition state
-  let transitionStartTime = 0;
-  let transitionDuration = 600; // 600ms for quick, smooth transitions
-  let transitionStartPos = new THREE.Vector3();
-  let transitionStartTarget = new THREE.Vector3();
-  let transitionTargetPos = new THREE.Vector3();
-  let transitionTargetLookAt = new THREE.Vector3();
-  
-  // Smooth easing function (ease-in-out quad) for gentle, natural movement
-  function easeInOutQuad(t) {
-    return t < 0.5 
-      ? 2 * t * t 
-      : 1 - Math.pow(-2 * t + 2, 2) / 2;
-  }
-  
   // Initialize camera to angle 1
   function setCameraAngle(angleNum) {
     currentAngle = angleNum;
     const angle = cameraAngles[angleNum];
     if (angle) {
-      transitionTargetPos.set(angle.position.x, angle.position.y, angle.position.z);
-      transitionTargetLookAt.set(angle.target.x, angle.target.y, angle.target.z);
-      
-      // Store starting positions for smooth interpolation
-      // Use currentCameraPos which should be updated before calling this
-      transitionStartPos.copy(currentCameraPos);
-      
-      // Calculate current look-at point from camera's current state
-      const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      direction.multiplyScalar(-1);
-      const currentLookAtPoint = camera.position.clone().add(direction);
-      transitionStartTarget.copy(currentLookAtPoint);
-      
-      // Start transition
-      transitionStartTime = performance.now();
-      isTransitioning = true;
+      targetCameraPos.set(angle.position.x, angle.position.y, angle.position.z);
+      // Only transition if the target is different from current position
+      const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
+      isTransitioning = distanceToTarget > 0.1; // Only transition if more than 0.1 units away
     }
   }
   
@@ -2613,16 +2587,14 @@ setTimeout(() => {
     btn.addEventListener('click', () => {
       const angleNum = parseInt(btn.dataset.angle);
       
-      // Capture current camera position (in case orbit controls moved it)
-      currentCameraPos.copy(camera.position);
-      
       // Disable orbit controls during transition for smooth preset angle movement
       if (controls) {
         controls.enabled = false;
       }
       
-      // Start smooth transition to new angle (setCameraAngle handles transition setup)
+      // Start smooth transition to new angle
       setCameraAngle(angleNum);
+      isTransitioning = true;
       
       // Update button states
       angleButtons.forEach(b => b.classList.remove('active'));
@@ -2630,10 +2602,14 @@ setTimeout(() => {
     });
   });
   
-  // Step 3: Spectrogram parameters
-  const freqBins = 96; // Frequency bins (X axis)
+  // Step 3: Spectrogram parameters - High frequency detail, square shape
+  const freqBins = 256; // Much higher frequency resolution for fine detail (was 96)
   const historyLength = 80; // Time history (Z axis)
-  const gridSpacing = 0.5;
+  // Make it square: width = depth
+  // Width: (256-1) * gridSpacingX, Depth: (80-1) * gridSpacingZ
+  // To make square: gridSpacingZ = (255 * gridSpacingX) / 79
+  const gridSpacingX = 0.186; // Frequency axis spacing
+  const gridSpacingZ = (255 * gridSpacingX) / 79; // Time axis spacing to make square
   const maxHeight = 15;
   
   // Step 4: Create rolling history buffer
@@ -2642,17 +2618,18 @@ setTimeout(() => {
     historyBuffer.push(new Float32Array(freqBins).fill(0));
   }
   
-  // Smoothing for audio data
+  // Smoothing for audio data - reduced for more detail/granularity
   const smoothedData = new Float32Array(freqBins).fill(0);
-  function smooth(prev, next, attack = 0.4, release = 0.1) {
+  function smooth(prev, next, attack = 0.2, release = 0.05) {
+    // Less aggressive smoothing to preserve fine detail and spikes
     const a = next > prev ? attack : release;
     return prev + (next - prev) * a;
   }
   
-  // Step 5: Create terrain geometry
+  // Step 5: Create terrain geometry (square shape)
   const geometry = new THREE.PlaneGeometry(
-    (freqBins - 1) * gridSpacing,
-    (historyLength - 1) * gridSpacing,
+    (freqBins - 1) * gridSpacingX,
+    (historyLength - 1) * gridSpacingZ,
     freqBins - 1,
     historyLength - 1
   );
@@ -3007,14 +2984,21 @@ setTimeout(() => {
     const fftSize = audio.analyser.fftSize;
     const binHz = sampleRate / fftSize;
     
+    // Use more of the FFT data for higher frequency resolution
+    // With 4096 FFT size, we get 2048 frequency bins
+    const availableBins = audio.dataArray.length;
+    
     for (let i = 0; i < freqBins; i++) {
-      // Map frequency bin to analyser data
-      const targetHz = (i / freqBins) * (sampleRate / 2);
+      // Map frequency bin to analyser data with better resolution
+      // Use logarithmic-like mapping to emphasize lower frequencies but still show high detail
+      const normalizedPos = i / freqBins;
+      // Map more linearly to capture fine detail across the spectrum
+      const targetHz = normalizedPos * (sampleRate / 2);
       const binIndex = Math.floor(targetHz / binHz);
-      const rawValue = audio.dataArray[Math.min(binIndex, audio.dataArray.length - 1)] / 255;
+      const rawValue = audio.dataArray[Math.min(binIndex, availableBins - 1)] / 255;
       
-      // Smooth the data
-      smoothedData[i] = smooth(smoothedData[i], rawValue, 0.4, 0.1);
+      // Less smoothing for more detail - preserve spikes and fine variations
+      smoothedData[i] = smooth(smoothedData[i], rawValue, 0.2, 0.05);
     }
     
     // Push new data into history buffer (shift left)
@@ -3107,70 +3091,70 @@ setTimeout(() => {
   function animate() {
     requestAnimationFrame(animate);
     
-    // Handle smooth transitions between preset angles with time-based easing
+    // Handle smooth transitions between preset angles
     if (isTransitioning) {
-      const now = performance.now();
-      const elapsed = now - transitionStartTime;
-      const progress = Math.min(1, elapsed / transitionDuration);
+      // Smoothly transition camera position
+      currentCameraPos.lerp(targetCameraPos, 0.08); // Slightly faster for smoother feel
       
-      if (progress >= 1) {
-        // Transition complete - snap to exact target
-        currentCameraPos.copy(transitionTargetPos);
-        camera.position.copy(currentCameraPos);
-        camera.lookAt(transitionTargetLookAt);
-        isTransitioning = false;
+      // Smoothly transition camera look-at target
+      const angle = cameraAngles[currentAngle];
+      if (angle) {
+        const targetLookAt = new THREE.Vector3(angle.target.x, angle.target.y, angle.target.z);
+        const currentLookAt = new THREE.Vector3();
+        camera.getWorldDirection(currentLookAt);
+        currentLookAt.multiplyScalar(-1).add(camera.position);
         
-        // Update tracking vectors
-        targetCameraPos.copy(transitionTargetPos);
+        // Interpolate look-at target
+        const lerpedLookAt = currentLookAt.lerp(targetLookAt, 0.08);
+        camera.lookAt(lerpedLookAt);
+      }
+      
+      // Check if we've reached the target (stop transitioning when close enough)
+      const distanceToTarget = currentCameraPos.distanceTo(targetCameraPos);
+      if (distanceToTarget < 0.1) {
+        currentCameraPos.copy(targetCameraPos); // Snap to exact target
+        const angle = cameraAngles[currentAngle];
+        if (angle) {
+          camera.lookAt(angle.target.x, angle.target.y, angle.target.z);
+        }
+        isTransitioning = false;
         
         // Re-enable orbit controls after transition completes
         if (controls) {
           controls.enabled = true;
-          controls.target.copy(transitionTargetLookAt);
-          controls.update();
+          // Sync controls target with current camera state
+          controls.target.set(angle.target.x, angle.target.y, angle.target.z);
+          camera.position.copy(currentCameraPos);
         }
       } else {
-        // Apply smooth easing (ease-in-out quad for gentle movement)
-        const easedProgress = easeInOutQuad(progress);
-        
-        // Interpolate camera position directly - smooth linear path
-        currentCameraPos.lerpVectors(transitionStartPos, transitionTargetPos, easedProgress);
-        
-        // Interpolate look-at target smoothly
-        const currentLookAt = new THREE.Vector3();
-        currentLookAt.lerpVectors(transitionStartTarget, transitionTargetLookAt, easedProgress);
-        
-        // Ensure camera maintains reasonable distance during transition
-        // This prevents the camera from going out of frame
-        const center = new THREE.Vector3(0, 0, 0);
-        const distance = currentCameraPos.distanceTo(center);
-        const minDistance = 40;
-        const maxDistance = 90; // Prevent camera from going too far out
-        
-        // Clamp distance to reasonable range to keep camera in frame
-        if (distance < minDistance) {
-          const direction = currentCameraPos.clone().normalize();
-          currentCameraPos.copy(direction.multiplyScalar(minDistance));
-        } else if (distance > maxDistance) {
-          const direction = currentCameraPos.clone().normalize();
-          currentCameraPos.copy(direction.multiplyScalar(maxDistance));
-        }
-        
-        // Apply camera position and look-at
+        // Update camera position during transition
         camera.position.copy(currentCameraPos);
-        camera.lookAt(currentLookAt);
       }
       
-      // Step 5: Apply reward camera zoom (only if not transitioning)
-      // Skip reward zoom during transitions to avoid conflicts
+      // Enforce minimum distance from center during transitions to prevent clipping
+      const center = new THREE.Vector3(0, 0, 0);
+      const distance = currentCameraPos.distanceTo(center);
+      const minDistance = 40; // Minimum distance to prevent camera from getting too close
+      
+      if (distance < minDistance) {
+        // Push camera away while maintaining direction
+        const direction = currentCameraPos.clone().normalize();
+        currentCameraPos.copy(direction.multiplyScalar(minDistance));
+        camera.position.copy(currentCameraPos);
+      }
+      
+      // Step 5: Apply reward camera zoom (move camera closer during reward)
+      if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
+        const direction = currentCameraPos.clone().normalize();
+        const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
+        const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
+        const zoomedPos = direction.multiplyScalar(safeZoomedDistance);
+        camera.position.copy(zoomedPos);
+      }
     } else {
       // No transition: orbit controls handle camera movement
       if (controls && controls.enabled) {
         controls.update();
-        
-        // Sync currentCameraPos with actual camera position when using orbit controls
-        // This ensures transitions start from the correct position
-        currentCameraPos.copy(camera.position);
         
         // Step 5: Apply reward camera zoom (move camera closer during reward)
         if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
@@ -3184,7 +3168,6 @@ setTimeout(() => {
             const direction = camera.position.clone().sub(controls.target).normalize();
             const zoomedPos = controls.target.clone().add(direction.multiplyScalar(safeZoomedDistance));
             camera.position.copy(zoomedPos);
-            currentCameraPos.copy(camera.position);
           }
         }
       } else {
