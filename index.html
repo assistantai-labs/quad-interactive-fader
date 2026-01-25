@@ -721,6 +721,29 @@ function checkVisualizerData() {
   return false;
 }
 
+// Preload audio files (fetch only, don't decode until user interaction)
+let audioPreloadPromises = null;
+
+function preloadAudioFiles() {
+  if (audioPreloadPromises) return audioPreloadPromises;
+  
+  audioPreloadPromises = Promise.all(
+    Object.entries(FILES).map(async ([key, filename]) => {
+      try {
+        const res = await fetch(filename);
+        if (!res.ok) throw new Error(`Missing file: ${filename}`);
+        const arr = await res.arrayBuffer();
+        return { key, arrayBuffer: arr };
+      } catch (err) {
+        console.error(`Failed to preload ${filename}:`, err);
+        throw err;
+      }
+    })
+  );
+  
+  return audioPreloadPromises;
+}
+
 async function loadBuffers() {
   if (audio.loading || Object.keys(audio.buffers).length) return;
   audio.loading = true;
@@ -728,12 +751,28 @@ async function loadBuffers() {
     showLoadingIndicator();
   }
   try {
-    for (const [key, filename] of Object.entries(FILES)) {
-      const res = await fetch(filename, { cache: "no-store" });
-      if (!res.ok) throw new Error(`Missing file: ${filename}`);
-      const arr = await res.arrayBuffer();
-      audio.buffers[key] = await audio.ctx.decodeAudioData(arr);
+    // Use preloaded files if available, otherwise fetch in parallel
+    let preloadedData;
+    if (audioPreloadPromises) {
+      preloadedData = await audioPreloadPromises;
+    } else {
+      // Fallback: fetch in parallel if preload didn't happen
+      preloadedData = await Promise.all(
+        Object.entries(FILES).map(async ([key, filename]) => {
+          const res = await fetch(filename);
+          if (!res.ok) throw new Error(`Missing file: ${filename}`);
+          const arr = await res.arrayBuffer();
+          return { key, arrayBuffer: arr };
+        })
+      );
     }
+    
+    // Decode all audio buffers in parallel
+    await Promise.all(
+      preloadedData.map(async ({ key, arrayBuffer }) => {
+        audio.buffers[key] = await audio.ctx.decodeAudioData(arrayBuffer);
+      })
+    );
   } finally {
     audio.loading = false;
     // Don't hide loading here - wait for visualizer to have data
@@ -3346,9 +3385,13 @@ let touchStartTime = 0;
 let isVerticalScrollIntent = false;
 let scrollOverlay = null;
 
-// Initialize scroll overlay
+// Initialize scroll overlay and start preloading audio
 document.addEventListener('DOMContentLoaded', () => {
   scrollOverlay = document.getElementById('scrollOverlay');
+  // Start preloading audio files immediately (fetch only, decode happens on user interaction)
+  preloadAudioFiles().catch(err => {
+    console.warn('Audio preload failed (will retry on play):', err);
+  });
 });
 
 // Check if target is an interactive element (slider, button, etc.)
@@ -3525,6 +3568,12 @@ document.addEventListener("wheel", (e) => {
 }, { passive: false });
 
 updatePlayButton();
+
+// Start preloading audio files immediately on page load
+// This allows files to start downloading as soon as possible, reducing load time when user clicks play
+preloadAudioFiles().catch(err => {
+  console.warn('Early audio preload failed (will retry on play):', err);
+});
 
 // Profile badge: hide if image missing, fade in if loaded
 (function(){
