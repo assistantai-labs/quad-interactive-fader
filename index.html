@@ -440,6 +440,53 @@
       border-color: rgba(255,255,255,0.28);
     }
 
+    /* Loading indicator */
+    .loadingIndicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .loadingIndicator.visible {
+      display: flex;
+    }
+
+    .loadingSpinner {
+      width: 60px;
+      height: 60px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top-color: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loadingText {
+      color: #fff;
+      font-family: "VCR OSD Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: clamp(16px, 2.2vw, 22px);
+      letter-spacing: 0.1em;
+      text-transform: lowercase;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+      animation: pulse 1.5s ease-in-out infinite;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
 
     @media (max-width: 767px){
       html, body {
@@ -551,6 +598,9 @@
     <div class="app">
       <div class="vizWrap">
         <div class="viz3d" id="viz3d">
+          <div class="loadingIndicator" id="loadingIndicator">
+            <div class="loadingSpinner"></div>
+          </div>
           <div class="viz3dControls">
             <button class="viz3dAngleBtn active" data-angle="1">1</button>
             <button class="viz3dAngleBtn" data-angle="2">2</button>
@@ -635,16 +685,54 @@ async function initAudio() {
   // Resume will be called from gestureStartAudio() or play button
 }
 
+let visualizerHasData = false;
+let userHasInteracted = false;
+
+function showLoadingIndicator() {
+  const indicator = document.getElementById('loadingIndicator');
+  if (indicator) indicator.classList.add('visible');
+}
+
+function hideLoadingIndicator() {
+  const indicator = document.getElementById('loadingIndicator');
+  if (indicator) indicator.classList.remove('visible');
+}
+
+function checkVisualizerData() {
+  // Check if visualizer has actual audio data (not just zeros)
+  if (!audio.analyser || !audio.dataArray || !audio.ctx || audio.ctx.state !== 'running' || !audio.playing) {
+    return false;
+  }
+  
+  // Get current frequency data
+  audio.analyser.getByteFrequencyData(audio.dataArray);
+  
+  // Check if there's any non-zero data
+  for (let i = 0; i < Math.min(100, audio.dataArray.length); i++) {
+    if (audio.dataArray[i] > 5) { // Threshold to account for noise
+      return true;
+    }
+  }
+  return false;
+}
+
 async function loadBuffers() {
   if (audio.loading || Object.keys(audio.buffers).length) return;
   audio.loading = true;
-  for (const [key, filename] of Object.entries(FILES)) {
-    const res = await fetch(filename, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Missing file: ${filename}`);
-    const arr = await res.arrayBuffer();
-    audio.buffers[key] = await audio.ctx.decodeAudioData(arr);
+  if (userHasInteracted) {
+    showLoadingIndicator();
   }
-  audio.loading = false;
+  try {
+    for (const [key, filename] of Object.entries(FILES)) {
+      const res = await fetch(filename, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Missing file: ${filename}`);
+      const arr = await res.arrayBuffer();
+      audio.buffers[key] = await audio.ctx.decodeAudioData(arr);
+    }
+  } finally {
+    audio.loading = false;
+    // Don't hide loading here - wait for visualizer to have data
+  }
 }
 
 function buildGraph() {
@@ -1944,6 +2032,12 @@ function makeSlider(opts){
     if (knobOpacity < 0.1) return;
     e.preventDefault();
 
+    // Mark user interaction and show loading if visualizer doesn't have data yet
+    userHasInteracted = true;
+    if (!visualizerHasData) {
+      showLoadingIndicator();
+    }
+
     // iOS audio: attempt resume on gesture
     gestureStartAudio();
 
@@ -2169,6 +2263,11 @@ let firstGestureDone = false;
 async function onFirstInteract(){
   if (firstGestureDone) return;
   firstGestureDone = true;
+  userHasInteracted = true;
+  visualizerHasData = false;
+  if (!visualizerHasData) {
+    showLoadingIndicator();
+  }
   try {
     await play();
     applyMix();
@@ -2181,12 +2280,17 @@ async function onFirstInteract(){
 
 btnPlay.addEventListener("click", async (e) => {
   e.preventDefault();
+  userHasInteracted = true;
   try{
     // iOS: click is a safe gesture; force resume
     await initAudio();
     await audio.ctx.resume();
 
     if (!audio.started) {
+      visualizerHasData = false;
+      if (!visualizerHasData) {
+        showLoadingIndicator();
+      }
       await play();
       applyMix();
       updatePlayButton();
@@ -2195,6 +2299,10 @@ btnPlay.addEventListener("click", async (e) => {
     if (audio.playing) {
       await pause();
     } else {
+      visualizerHasData = false; // Reset when starting to play
+      if (userHasInteracted) {
+        showLoadingIndicator();
+      }
       await play();
     }
     updatePlayButton();
@@ -2208,10 +2316,15 @@ btnPlay.addEventListener("click", async (e) => {
 window.addEventListener("keydown", async (e) => {
   if (e.code !== "Space") return;
   e.preventDefault();
+  userHasInteracted = true;
   try{
     await initAudio();
     await audio.ctx.resume();
     if (!audio.started) {
+      visualizerHasData = false;
+      if (!visualizerHasData) {
+        showLoadingIndicator();
+      }
       await play();
       applyMix();
       updatePlayButton();
@@ -2220,6 +2333,10 @@ window.addEventListener("keydown", async (e) => {
     if (audio.playing) {
       await pause();
     } else {
+      visualizerHasData = false; // Reset when starting to play
+      if (userHasInteracted) {
+        showLoadingIndicator();
+      }
       await play();
     }
     updatePlayButton();
@@ -3172,6 +3289,14 @@ setTimeout(() => {
     if (mixChange > 0.001) {
       sliderImpulse = Math.max(sliderImpulse, mixChange * 3.0);
       lastMixAmount = currentMix;
+    }
+    
+    // Check if visualizer has data and hide loading indicator
+    if (userHasInteracted && !visualizerHasData) {
+      visualizerHasData = checkVisualizerData();
+      if (visualizerHasData) {
+        hideLoadingIndicator();
+      }
     }
     
     updateImpulse();
