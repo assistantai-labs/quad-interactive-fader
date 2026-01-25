@@ -60,6 +60,7 @@
     
     .scroll-overlay.active {
       pointer-events: auto; /* Intercept touches for parent page scrolling */
+      touch-action: pan-y; /* Explicitly allow vertical panning */
     }
 
     /* New app layout structure */
@@ -82,6 +83,7 @@
       justify-content: center;
       overflow: hidden;
       position: relative;
+      touch-action: pan-y; /* Allow vertical scrolling on visualizer */
     }
 
     .vizWrap canvas,
@@ -196,6 +198,7 @@
       box-shadow: none; /* Remove shadow since background is transparent */
       order: -1; /* Ensure it appears first in flex column */
       flex-shrink: 1; /* Allow it to shrink on mobile */
+      touch-action: pan-y; /* Allow vertical scrolling on visualizer */
     }
     
     .viz3d canvas {
@@ -203,6 +206,8 @@
       width: 100%;
       height: 100%;
       background: transparent !important;
+      touch-action: pan-y; /* Allow vertical scrolling on canvas */
+      pointer-events: auto; /* Allow touch events but enable scrolling */
     }
     
     .viz3dControls {
@@ -3372,7 +3377,7 @@ document.addEventListener("touchstart", (e) => {
   // Reset scroll intent detection
   isVerticalScrollIntent = false;
   
-  // If touching an interactive element, keep overlay inactive
+  // If touching an interactive element (slider, button), prevent scrolling
   if (isInteractiveElement(target)) {
     if (scrollOverlay) scrollOverlay.classList.remove('active');
     
@@ -3389,7 +3394,22 @@ document.addEventListener("touchstart", (e) => {
     return; // Don't activate overlay for interactive elements
   }
   
-  // Track touch start for scroll intent detection
+  // Check if touching visualizer area (glass) - allow vertical scrolling
+  const vizWrap = target.closest('.vizWrap');
+  const viz3d = target.closest('.viz3d');
+  if (vizWrap || viz3d) {
+    // Allow vertical scrolling on visualizer - activate overlay immediately
+    if (scrollOverlay) scrollOverlay.classList.add('active');
+    // Track touch start for scroll detection
+    if (e.touches.length > 0) {
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+      touchStartTime = performance.now();
+    }
+    return;
+  }
+  
+  // Track touch start for scroll intent detection on other areas
   if (e.touches.length > 0) {
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
@@ -3403,7 +3423,7 @@ document.addEventListener("touchstart", (e) => {
 document.addEventListener("touchmove", (e) => {
   const target = e.target;
   
-  // If user is interacting with slider/button, keep overlay inactive
+  // If user is interacting with slider/button, prevent scrolling
   if (isInteractiveElement(target)) {
     if (scrollOverlay) scrollOverlay.classList.remove('active');
     
@@ -3429,7 +3449,27 @@ document.addEventListener("touchmove", (e) => {
     return;
   }
   
-  // For non-interactive elements, detect scroll intent
+  // Check if touching visualizer area (glass) - always allow vertical scrolling
+  const vizWrap = target.closest('.vizWrap');
+  const viz3d = target.closest('.viz3d');
+  if (vizWrap || viz3d) {
+    // Always allow vertical scrolling on visualizer
+    if (scrollOverlay) scrollOverlay.classList.add('active');
+    
+    if (e.touches.length > 0) {
+      const touch = e.touches[0];
+      const deltaX = Math.abs(touch.clientX - touchStartX);
+      
+      // Only prevent horizontal scrolling, allow vertical
+      if (deltaX > 15) {
+        e.preventDefault(); // Prevent horizontal scrolling only
+      }
+      // Don't preventDefault for vertical scrolling - let it bubble to parent
+    }
+    return;
+  }
+  
+  // For other non-interactive elements, detect scroll intent
   if (e.touches.length > 0 && touchStartY !== 0 && touchStartX !== 0) {
     const touch = e.touches[0];
     const deltaY = Math.abs(touch.clientY - touchStartY);
