@@ -842,10 +842,11 @@ function setMix(tone, blend) {
 
   if (!audio.gains.rawVocals) return;
 
+  // Smooth fading between tracks
   setGain(audio.gains.rawVocals, vocalsLayer * rawPart);
   setGain(audio.gains.quadVocals, vocalsLayer * quadPart);
-  setGain(audio.gains.rawFull, fullLayer   * rawPart);
-  setGain(audio.gains.quadFull, fullLayer  * quadPart);
+  setGain(audio.gains.rawFull, fullLayer * rawPart);
+  setGain(audio.gains.quadFull, fullLayer * quadPart);
 }
 
 async function ensureStarted() {
@@ -3075,9 +3076,10 @@ setTimeout(() => {
   
   function mixAmount() {
     // Legacy function for backward compatibility
+    // Give more weight to RAW/MIXED slider (rawMix) than VOCALS/BEAT slider (vocalBeat)
     const rawMix = getRawMix();
     const vocalBeat = getVocalBeat();
-    return Math.max(0, Math.min(1, (rawMix + vocalBeat) * 0.5));
+    return Math.max(0, Math.min(1, rawMix * 0.7 + vocalBeat * 0.3));
   }
   
   function updateImpulse() {
@@ -3195,7 +3197,9 @@ setTimeout(() => {
     // Step 1: Add minimum brightness floor for RAW+VOCALS corner (gloom factor)
     const gloomFactor = (1 - rawMix) * (1 - vocalBeat);
     const minLuma = 0.06 + (0.18 - 0.06) * gloomFactor; // Lerp from 0.06 to 0.18 based on gloom
-    const baseBrightness = 0.3 + 0.7 * mixT + sliderImpulse * 0.5;
+    // Give more weight to RAW/MIXED slider for brightness/volume effect
+    const weightedMix = rawMix * 0.7 + vocalBeat * 0.3;
+    const baseBrightness = 0.3 + 0.7 * weightedMix + sliderImpulse * 0.5;
     const brightness = Math.max(minLuma, baseBrightness);
     
     // Reusable color object to avoid allocations in tight loop
