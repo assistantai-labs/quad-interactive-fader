@@ -790,7 +790,7 @@ async function loadBuffers() {
   }
 }
 
-function buildGraph() {
+async function buildGraph() {
   // iOS: sources must be started from user gesture, so we start them immediately
   // when this is called (which should be from ensureStarted after resume)
   
@@ -827,12 +827,19 @@ function buildGraph() {
   const make = (name, bufKey) => {
     const src = audio.ctx.createBufferSource();
     const buffer = audio.buffers[bufKey];
+    
+    // Verify buffer is valid
+    if (!buffer || buffer.length === 0) {
+      throw new Error(`Invalid buffer for ${name}`);
+    }
+    
     src.buffer = buffer;
     src.loop = true;
     // Set explicit loop points for perfect seamless looping
     // Loop from start (0) to end of buffer - this ensures seamless looping
     src.loopStart = 0;
     src.loopEnd = buffer.duration;
+    
     const gain = audio.ctx.createGain();
     gain.gain.value = 0;
     src.connect(gain).connect(audio.masterGain);
@@ -845,11 +852,13 @@ function buildGraph() {
   make("rawFull", "rawFull");
   make("quadFull", "quadFull");
 
-  // Start all sources at exactly the same time for perfect synchronization
-  // Use currentTime + small offset to ensure context is running
-  const t0 = audio.ctx.currentTime + 0.01;
+  // Ensure audio context is fully ready and stable
+  // Use a more precise timing approach
+  const now = audio.ctx.currentTime;
+  const t0 = now + 0.1; // Give enough time for context to stabilize
   
-  // Start all sources synchronously - BufferSource with loop=true will loop seamlessly
+  // Start all sources at exactly the same time for perfect synchronization
+  // BufferSource with loop=true handles looping automatically and seamlessly
   const sources = Object.values(audio.sources);
   for (let i = 0; i < sources.length; i++) {
     try {
@@ -898,8 +907,34 @@ async function ensureStarted() {
       throw err; // Re-throw so caller knows it failed
     }
   }
+  
+  // Ensure context is fully running before loading buffers
+  if (audio.ctx.state !== 'running') {
+    await new Promise(resolve => {
+      const checkState = () => {
+        if (audio.ctx.state === 'running') {
+          resolve();
+        } else {
+          setTimeout(checkState, 10);
+        }
+      };
+      checkState();
+    });
+  }
+  
   await loadBuffers();
-  buildGraph();
+  
+  // Verify all buffers are loaded and ready
+  const allBuffersReady = Object.keys(FILES).every(key => {
+    const buffer = audio.buffers[key];
+    return buffer && buffer.length > 0 && buffer.duration > 0;
+  });
+  
+  if (!allBuffersReady) {
+    throw new Error('Not all audio buffers are ready');
+  }
+  
+  await buildGraph();
   audio.started = true;
   audio.playing = true;
   updatePlayButton();
