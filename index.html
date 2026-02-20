@@ -767,12 +767,23 @@ async function loadBuffers() {
       );
     }
     
-    // Decode all audio buffers in parallel
+    // Decode all audio buffers in parallel and verify they're loaded
     await Promise.all(
       preloadedData.map(async ({ key, arrayBuffer }) => {
-        audio.buffers[key] = await audio.ctx.decodeAudioData(arrayBuffer);
+        const buffer = await audio.ctx.decodeAudioData(arrayBuffer);
+        // Verify buffer is valid and has audio data
+        if (!buffer || buffer.length === 0) {
+          throw new Error(`Invalid audio buffer for ${key}`);
+        }
+        audio.buffers[key] = buffer;
       })
     );
+    
+    // Verify all buffers are loaded and check durations
+    const allLoaded = Object.keys(FILES).every(key => audio.buffers[key]);
+    if (!allLoaded) {
+      throw new Error('Not all audio buffers loaded successfully');
+    }
   } finally {
     audio.loading = false;
     // Don't hide loading here - wait for visualizer to have data
@@ -782,6 +793,11 @@ async function loadBuffers() {
 function buildGraph() {
   // iOS: sources must be started from user gesture, so we start them immediately
   // when this is called (which should be from ensureStarted after resume)
+  
+  // Don't rebuild if already built
+  if (audio.sources.rawVocals && audio.masterGain) {
+    return;
+  }
   
   // Create master gain and analyser to analyze final output
   audio.masterGain = audio.ctx.createGain();
@@ -795,9 +811,18 @@ function buildGraph() {
   audio.masterGain.connect(audio.analyser);
   audio.analyser.connect(audio.ctx.destination);
   
-  // Find the shortest buffer duration to ensure all loops stay in sync
-  const bufferDurations = Object.values(audio.buffers).map(buf => buf.duration);
-  const minDuration = Math.min(...bufferDurations);
+  // Check buffer durations and ensure they're all the same length
+  const bufferDurations = Object.entries(audio.buffers).map(([key, buf]) => ({ key, duration: buf.duration }));
+  const durations = bufferDurations.map(b => b.duration);
+  const maxDuration = Math.max(...durations);
+  const minDuration = Math.min(...durations);
+  
+  // Log durations for debugging
+  console.log('Audio buffer durations:', bufferDurations.map(b => `${b.key}: ${b.duration.toFixed(3)}s`).join(', '));
+  
+  if (Math.abs(maxDuration - minDuration) > 0.01) {
+    console.warn(`Warning: Audio files have different durations (${minDuration.toFixed(3)}s - ${maxDuration.toFixed(3)}s). This may cause looping issues.`);
+  }
   
   const make = (name, bufKey) => {
     const src = audio.ctx.createBufferSource();
@@ -805,12 +830,12 @@ function buildGraph() {
     src.buffer = buffer;
     src.loop = true;
     // Set explicit loop points for perfect seamless looping
-    // Loop from start (0) to end of buffer
+    // Loop from start (0) to end of buffer - this ensures seamless looping
     src.loopStart = 0;
     src.loopEnd = buffer.duration;
     const gain = audio.ctx.createGain();
     gain.gain.value = 0;
-    src.connect(gain).connect(audio.masterGain); // Connect to master gain instead of destination
+    src.connect(gain).connect(audio.masterGain);
     audio.sources[name] = src;
     audio.gains[name] = gain;
   };
@@ -821,10 +846,10 @@ function buildGraph() {
   make("quadFull", "quadFull");
 
   // Start all sources at exactly the same time for perfect synchronization
-  // Use a small offset (0.01s) to ensure context is running and all sources start together
+  // Use currentTime + small offset to ensure context is running
   const t0 = audio.ctx.currentTime + 0.01;
   
-  // Start all sources synchronously at the exact same time
+  // Start all sources synchronously - BufferSource with loop=true will loop seamlessly
   const sources = Object.values(audio.sources);
   for (let i = 0; i < sources.length; i++) {
     try {
