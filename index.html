@@ -795,10 +795,19 @@ function buildGraph() {
   audio.masterGain.connect(audio.analyser);
   audio.analyser.connect(audio.ctx.destination);
   
+  // Find the shortest buffer duration to ensure all loops stay in sync
+  const bufferDurations = Object.values(audio.buffers).map(buf => buf.duration);
+  const minDuration = Math.min(...bufferDurations);
+  
   const make = (name, bufKey) => {
     const src = audio.ctx.createBufferSource();
-    src.buffer = audio.buffers[bufKey];
+    const buffer = audio.buffers[bufKey];
+    src.buffer = buffer;
     src.loop = true;
+    // Set explicit loop points for perfect seamless looping
+    // Loop from start (0) to end of buffer
+    src.loopStart = 0;
+    src.loopEnd = buffer.duration;
     const gain = audio.ctx.createGain();
     gain.gain.value = 0;
     src.connect(gain).connect(audio.masterGain); // Connect to master gain instead of destination
