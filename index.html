@@ -811,16 +811,19 @@ function buildGraph() {
   make("rawFull", "rawFull");
   make("quadFull", "quadFull");
 
-  // Start sources immediately (must be in user gesture context)
-  // Use a small offset to ensure context is running
-  const t0 = Math.max(audio.ctx.currentTime, audio.ctx.currentTime + 0.01);
-  Object.values(audio.sources).forEach(s => {
+  // Start all sources at exactly the same time for perfect synchronization
+  // Use a small offset (0.01s) to ensure context is running and all sources start together
+  const t0 = audio.ctx.currentTime + 0.01;
+  
+  // Start all sources synchronously at the exact same time
+  const sources = Object.values(audio.sources);
+  for (let i = 0; i < sources.length; i++) {
     try {
-      s.start(t0);
+      sources[i].start(t0);
     } catch (err) {
       console.warn("Failed to start audio source:", err);
     }
-  });
+  }
 }
 
 function setMix(tone, blend) {
