@@ -3445,7 +3445,7 @@ document.addEventListener("touchstart", (e) => {
   // Reset scroll intent detection
   isVerticalScrollIntent = false;
   
-  // If touching an interactive element (slider, button), prevent scrolling
+  // If touching an interactive element (slider, button), do NOT allow scroll-through
   if (isInteractiveElement(target)) {
     if (scrollOverlay) scrollOverlay.classList.remove('active');
     
@@ -3459,33 +3459,17 @@ document.addEventListener("touchstart", (e) => {
         isDraggingSlider = false;
       }
     }
-    return; // Don't activate overlay for interactive elements
-  }
-  
-  // Check if touching visualizer area (glass) - allow vertical scrolling
-  const vizWrap = target.closest('.vizWrap');
-  const viz3d = target.closest('.viz3d');
-  if (vizWrap || viz3d) {
-    // Allow vertical scrolling on visualizer - activate overlay immediately
-    if (scrollOverlay) scrollOverlay.classList.add('active');
-    // Track touch start for scroll detection
-    if (e.touches.length > 0) {
-      touchStartY = e.touches[0].clientY;
-      touchStartX = e.touches[0].clientX;
-      touchStartTime = performance.now();
-    }
     return;
   }
   
-  // Track touch start for scroll intent detection on other areas
+  // Anywhere else on the iframe (visualizer, panel background, app area): allow vertical scroll to parent
+  // Activate overlay immediately so finger can scroll the page without scrolling the iframe
+  if (scrollOverlay) scrollOverlay.classList.add('active');
   if (e.touches.length > 0) {
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
     touchStartTime = performance.now();
   }
-  
-  // Initially keep overlay inactive (pointer-events: none)
-  if (scrollOverlay) scrollOverlay.classList.remove('active');
 }, { passive: true });
 
 document.addEventListener("touchmove", (e) => {
@@ -3537,31 +3521,18 @@ document.addEventListener("touchmove", (e) => {
     return;
   }
   
-  // For other non-interactive elements, detect scroll intent
+  // For any other touch (non-interactive): overlay is already active from touchstart
+  // Only prevent horizontal scroll so iframe never scrolls sideways; allow vertical
   if (e.touches.length > 0 && touchStartY !== 0 && touchStartX !== 0) {
     const touch = e.touches[0];
-    const deltaY = Math.abs(touch.clientY - touchStartY);
     const deltaX = Math.abs(touch.clientX - touchStartX);
-    const deltaTime = performance.now() - touchStartTime;
+    const deltaY = Math.abs(touch.clientY - touchStartY);
     
-    // Detect vertical scroll intent: vertical movement > horizontal, and significant
-    const VERTICAL_THRESHOLD = 10; // Minimum pixels to detect vertical scroll
-    const HORIZONTAL_THRESHOLD = 15; // Maximum horizontal movement to still be "vertical scroll"
-    
-    if (deltaY > VERTICAL_THRESHOLD && deltaY > deltaX * 1.5 && deltaX < HORIZONTAL_THRESHOLD) {
-      // Vertical scroll detected - activate overlay to allow parent page scroll
-      isVerticalScrollIntent = true;
-      if (scrollOverlay) scrollOverlay.classList.add('active');
-      // Don't preventDefault - let the scroll event bubble to parent
-    } else if (deltaX > HORIZONTAL_THRESHOLD && deltaX > deltaY * 1.5) {
-      // Horizontal movement detected - prevent horizontal scroll
-      isVerticalScrollIntent = false;
-      if (scrollOverlay) scrollOverlay.classList.remove('active');
-      e.preventDefault(); // Prevent horizontal scrolling
-    } else {
-      // Ambiguous movement - keep overlay inactive initially
-      if (scrollOverlay) scrollOverlay.classList.remove('active');
+    // Prevent horizontal scroll only - never scroll the iframe sideways
+    if (deltaX > 15 && deltaX > deltaY * 1.5) {
+      e.preventDefault();
     }
+    // Vertical scroll: do not preventDefault so parent page can scroll
   }
 }, { passive: false }); // non-passive to allow preventDefault for horizontal scrolls
 
