@@ -2101,6 +2101,9 @@ function makeSlider(opts){
       showLoadingIndicator();
     }
 
+    // Start audio as soon as user touches slider (same as play button) so visualizer doesn't load endlessly
+    opts.onFirstInteract?.();
+
     // iOS audio: attempt resume on gesture
     gestureStartAudio();
 
