@@ -76,14 +76,16 @@
     }
 
     .vizWrap {
-      flex: 1 1 auto; /* take remaining space */
-      min-height: 0; /* critical: allows flex child to shrink */
+      flex: 1 1 auto;
+      min-height: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
       position: relative;
-      touch-action: pan-y; /* Allow vertical scrolling on visualizer */
+      touch-action: pan-y;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     .vizWrap canvas,
@@ -184,9 +186,8 @@
       display: none; /* Hide old 2D visualizer */
     }
     
+    #viz3d,
     .viz3d {
-      /* Width will be dynamically set by JavaScript to match panel width */
-      /* Default fallback width for initial render */
       width: min(920px, 96vw);
       max-width: 100%;
       height: 400px;
@@ -194,20 +195,25 @@
       border-radius: 22px;
       margin: 0 auto 20px auto;
       position: relative;
-      overflow: hidden; /* Prevent content from extending beyond bounds */
-      box-shadow: none; /* Remove shadow since background is transparent */
-      order: -1; /* Ensure it appears first in flex column */
-      flex-shrink: 1; /* Allow it to shrink on mobile */
-      touch-action: pan-y; /* Allow vertical scrolling on visualizer */
+      overflow: hidden;
+      box-shadow: none;
+      order: -1;
+      flex-shrink: 1;
+      touch-action: pan-y;
+      -webkit-user-select: none;
+      user-select: none;
     }
     
+    #viz3d canvas,
     .viz3d canvas {
       display: block;
       width: 100%;
       height: 100%;
       background: transparent !important;
-      touch-action: pan-y; /* Allow vertical scrolling on canvas */
-      pointer-events: auto; /* Allow touch events but enable scrolling */
+      touch-action: pan-y;
+      -webkit-user-select: none;
+      user-select: none;
+      pointer-events: auto;
     }
     
     .viz3dControls {
@@ -2744,52 +2750,35 @@ setTimeout(() => {
     }, 250);
   });
   
-  // Step 2: Add OrbitControls (enabled by default for drag-to-rotate)
-  let controls;
+  // Step 2: OrbitControls exist but are DISABLED - visualizer must not be draggable/pannable.
+  // Camera is controlled only by preset angle buttons; no pointer capture on visualizer.
+  let controls = null;
   
   try {
-    // OrbitControls might be on THREE or global scope
     const ControlsClass = THREE.OrbitControls || OrbitControls;
     if (ControlsClass) {
       controls = new ControlsClass(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
-      controls.enableZoom = true;
-      controls.enablePan = true;
-      controls.minDistance = 20;
-      controls.maxDistance = 80;
       controls.target.set(0, 0, 0);
-      controls.enabled = true; // Enabled by default - always allow dragging
-      
-      // Mobile touch support
-      if (controls.touches) {
-        controls.touches.ONE = THREE.TOUCH.ROTATE;
-        controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
-      }
-      console.log('OrbitControls initialized (enabled)');
-    } else {
-      console.warn('OrbitControls not available');
+      // Hard lock: no user drag/pan/zoom on the visualizer
+      controls.enabled = false;
+      controls.enableRotate = false;
+      controls.enablePan = false;
+      controls.enableZoom = false;
+      console.log('OrbitControls initialized (disabled - preset angles only)');
     }
   } catch (e) {
-    console.warn('Failed to create OrbitControls:', e);
+    console.warn('OrbitControls init:', e);
   }
   
-  // Set up angle selection buttons with smooth transitions
+  // Set up angle selection buttons - only way to change camera
   const angleButtons = viz3dContainer.querySelectorAll('.viz3dAngleBtn[data-angle]');
   
   angleButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const angleNum = parseInt(btn.dataset.angle);
-      
-      // Disable orbit controls when using preset angles
-      if (controls) {
-        controls.enabled = false;
-      }
-      
-      // Set new target angle - camera will smoothly move to it
       setCameraAngle(angleNum);
-      
-      // Update button states
       angleButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     });
@@ -3304,26 +3293,11 @@ setTimeout(() => {
   function animate() {
     requestAnimationFrame(animate);
     
-    // Smoothly move camera to target angle (always active, no transition state)
-    if (controls && controls.enabled) {
-      // Orbit controls are active - let them handle camera
-      controls.update();
-      
-      // Step 5: Apply reward camera zoom (move camera closer during reward)
-      if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
-        const center = new THREE.Vector3(0, 0, 0);
-        const currentDistance = camera.position.distanceTo(center);
-        const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
-        const minDistance = 15; // Match OrbitControls minDistance
-        const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
-        
-        if (currentDistance !== safeZoomedDistance) {
-          const direction = camera.position.clone().sub(controls.target).normalize();
-          const zoomedPos = controls.target.clone().add(direction.multiplyScalar(safeZoomedDistance));
-          camera.position.copy(zoomedPos);
-        }
-      }
-    } else {
+    // Camera is always driven by preset angles (OrbitControls disabled)
+    if (controls) {
+      controls.update(); // no-op when disabled, keeps API happy
+    }
+    {
       // Smoothly move camera toward target angle
       currentCameraPos.lerp(targetCameraPos, 0.05); // Smooth lerp to target position
       currentLookAt.lerp(targetLookAt, 0.05); // Smooth lerp to target look-at
@@ -3501,40 +3475,26 @@ document.addEventListener("touchmove", (e) => {
     return;
   }
   
-  // Check if touching visualizer area (glass) - always allow vertical scrolling
-  const vizWrap = target.closest('.vizWrap');
-  const viz3d = target.closest('.viz3d');
-  if (vizWrap || viz3d) {
-    // Always allow vertical scrolling on visualizer
+  // Visualizer/canvas: never capture touch - do NOT preventDefault so parent page can scroll
+  const vizWrapEl = target.closest('.vizWrap');
+  const viz3dEl = target.closest('.viz3d');
+  const onVisualizer = vizWrapEl || viz3dEl || target.tagName === 'CANVAS';
+  if (onVisualizer) {
     if (scrollOverlay) scrollOverlay.classList.add('active');
-    
-    if (e.touches.length > 0) {
-      const touch = e.touches[0];
-      const deltaX = Math.abs(touch.clientX - touchStartX);
-      
-      // Only prevent horizontal scrolling, allow vertical
-      if (deltaX > 15) {
-        e.preventDefault(); // Prevent horizontal scrolling only
-      }
-      // Don't preventDefault for vertical scrolling - let it bubble to parent
-    }
+    // Never preventDefault on visualizer - scrolling must pass through
     return;
   }
   
-  // For any other touch (non-interactive): overlay is already active from touchstart
-  // Only prevent horizontal scroll so iframe never scrolls sideways; allow vertical
+  // Other non-interactive areas: only prevent horizontal so iframe never scrolls sideways
   if (e.touches.length > 0 && touchStartY !== 0 && touchStartX !== 0) {
     const touch = e.touches[0];
     const deltaX = Math.abs(touch.clientX - touchStartX);
     const deltaY = Math.abs(touch.clientY - touchStartY);
-    
-    // Prevent horizontal scroll only - never scroll the iframe sideways
     if (deltaX > 15 && deltaX > deltaY * 1.5) {
       e.preventDefault();
     }
-    // Vertical scroll: do not preventDefault so parent page can scroll
   }
-}, { passive: false }); // non-passive to allow preventDefault for horizontal scrolls
+}, { passive: false });
 
 document.addEventListener("touchend", (e) => {
   // Reset states
@@ -3552,15 +3512,18 @@ document.addEventListener("touchend", (e) => {
   }
 }, { passive: true });
 
-// Also handle mouse wheel for desktop - allow vertical scroll, prevent horizontal
+// Wheel: over visualizer do nothing (page scrolls normally). Else only prevent horizontal.
+function isOnVisualizer(el) {
+  if (!el) return false;
+  return el.closest('.vizWrap') || el.closest('.viz3d') || el.tagName === 'CANVAS';
+}
 document.addEventListener("wheel", (e) => {
-  // Allow vertical scrolling (deltaY)
-  // Only prevent horizontal scrolling (deltaX)
+  if (isOnVisualizer(e.target)) {
+    return; // Do not prevent - let parent page scroll normally
+  }
   if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-    // Horizontal scroll attempt - prevent it
     e.preventDefault();
   }
-  // Vertical scroll - allow it to pass through
 }, { passive: false });
 
 updatePlayButton();
