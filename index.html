@@ -257,6 +257,17 @@
       box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
     }
 
+    /* Overlay on top of visualizer canvas so touches scroll the parent page */
+    .viz3d-scroll-pass {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: auto;
+      touch-action: pan-y;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
     .panel {
       width: min(920px, 96vw);
       border-radius: 22px;
@@ -2750,27 +2761,15 @@ setTimeout(() => {
     }, 250);
   });
   
-  // Step 2: OrbitControls exist but are DISABLED - visualizer must not be draggable/pannable.
-  // Camera is controlled only by preset angle buttons; no pointer capture on visualizer.
-  let controls = null;
+  // No OrbitControls - visualizer is not draggable. Camera only changes via 1/2/3 buttons.
+  renderer.domElement.style.pointerEvents = 'none';
+  renderer.domElement.setAttribute('aria-hidden', 'true');
   
-  try {
-    const ControlsClass = THREE.OrbitControls || OrbitControls;
-    if (ControlsClass) {
-      controls = new ControlsClass(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.target.set(0, 0, 0);
-      // Hard lock: no user drag/pan/zoom on the visualizer
-      controls.enabled = false;
-      controls.enableRotate = false;
-      controls.enablePan = false;
-      controls.enableZoom = false;
-      console.log('OrbitControls initialized (disabled - preset angles only)');
-    }
-  } catch (e) {
-    console.warn('OrbitControls init:', e);
-  }
+  // Overlay on top of canvas so touches scroll the parent (1/2/3 buttons stay above via z-index)
+  const scrollPass = document.createElement('div');
+  scrollPass.className = 'viz3d-scroll-pass';
+  scrollPass.setAttribute('aria-hidden', 'true');
+  viz3dContainer.appendChild(scrollPass);
   
   // Set up angle selection buttons - only way to change camera
   const angleButtons = viz3dContainer.querySelectorAll('.viz3dAngleBtn[data-angle]');
@@ -3293,10 +3292,7 @@ setTimeout(() => {
   function animate() {
     requestAnimationFrame(animate);
     
-    // Camera is always driven by preset angles (OrbitControls disabled)
-    if (controls) {
-      controls.update(); // no-op when disabled, keeps API happy
-    }
+    // Camera only moves via preset angle buttons (no user drag)
     {
       // Smoothly move camera toward target angle
       currentCameraPos.lerp(targetCameraPos, 0.05); // Smooth lerp to target position
