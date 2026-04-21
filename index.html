@@ -491,7 +491,7 @@
       height: var(--hitH);
       display: flex;
       align-items: center;
-      touch-action: pan-x; /* Only allow horizontal panning for slider, prevent vertical scroll */
+      touch-action: pan-y; /* Allow vertical page scroll even over slider knobs */
       padding-left: var(--endPad);
       padding-right: var(--endPad);
       box-sizing: border-box;
@@ -549,10 +549,14 @@
     }
 
     .controls {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
       padding-top: 6px;
-      padding-bottom: 8px;
-      margin-top: 0;
+      padding-bottom: 10px;
+      margin-top: 2px;
       margin-left: 0;
       margin-right: 0;
       margin-bottom: 0;
@@ -560,13 +564,7 @@
       z-index: 2;
       flex-shrink: 0; /* Never shrink */
       width: 100%; /* Ensure full width for centering */
-      min-height: calc(var(--btnH) + 8px);
-      padding-left: 12px;
-      padding-right: 12px;
-    }
-
-    .controlsSpacer {
-      display: none;
+      min-height: calc(var(--btnH) + 56px);
     }
 
     .btn {
@@ -589,24 +587,23 @@
       transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
       font-family: inherit;
       margin: 0;
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      justify-self: center;
+      position: relative;
+      left: auto;
+      top: auto;
+      transform: none;
     }
 
     .btn:active {
-      transform: translate(-50%, -50%) scale(1.03);
+      transform: scale(1.03);
       background: rgba(255,255,255,0.12);
       border-color: rgba(255,255,255,0.28);
     }
 
     .beatControl {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
+      position: relative;
+      right: auto;
+      top: auto;
+      transform: none;
       display: inline-flex;
       align-items: center;
       gap: 12px;
@@ -785,17 +782,11 @@
         margin-bottom: 0;
         flex-shrink: 0;
         flex-grow: 0;
-        min-height: calc(var(--btnH) + 6px);
-        padding-left: 8px;
-        padding-right: 8px;
-      }
-
-      .controlsSpacer {
-        display: none;
+        min-height: calc(var(--btnH) + 50px);
+        gap: 8px;
       }
 
       .beatControl {
-        right: 8px;
         gap: 8px;
       }
 
@@ -891,14 +882,13 @@
       </div>
 
           <div class="controls">
-            <div class="controlsSpacer" aria-hidden="true"></div>
-            <button class="btn" id="btnPlay">PLAY</button>
             <div class="beatControl">
               <span class="beatLabel">BEAT</span>
               <button class="beatToggle is-on" id="beatToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle beat">
                 <span class="beatToggleKnob"></span>
               </button>
             </div>
+            <button class="btn" id="btnPlay">PLAY</button>
           </div>
         </div>
       </div>
@@ -2648,7 +2638,10 @@ function makeSlider(opts){
     // Prevent interaction if knob is hidden (opacity is 0 or very low)
     const knobOpacity = parseFloat(knob.style.opacity) || 1;
     if (knobOpacity < 0.1) return;
-    e.preventDefault();
+    // Let touch gestures keep vertical page scroll behavior.
+    if (e.pointerType !== "touch" && e.pointerType !== "pen" && e.cancelable) {
+      e.preventDefault();
+    }
 
     // Mark user interaction and show loading if visualizer doesn't have data yet
     userHasInteracted = true;
@@ -2664,7 +2657,10 @@ function makeSlider(opts){
 
     isDown = true;
     pointerId = e.pointerId;
-    wrap.setPointerCapture(pointerId);
+    // Do not capture touch pointers so vertical page scrolling can continue naturally.
+    if (e.pointerType !== "touch" && e.pointerType !== "pen" && wrap.setPointerCapture) {
+      wrap.setPointerCapture(pointerId);
+    }
     knob.classList.add("isDown");
 
     // Determine if slingshot can arm (edge + settled)
@@ -2707,7 +2703,9 @@ function makeSlider(opts){
 
   function onMove(e){
     if (!isDown || e.pointerId !== pointerId) return;
-    e.preventDefault();
+    if (e.pointerType !== "touch" && e.pointerType !== "pen" && e.cancelable) {
+      e.preventDefault();
+    }
 
     // Easter egg vertical pull tracking
     if (vPullEnabled && vPulling) {
@@ -2745,7 +2743,9 @@ function makeSlider(opts){
 
   function onUp(e){
     if (!isDown || e.pointerId !== pointerId) return;
-    e.preventDefault();
+    if (e.pointerType !== "touch" && e.pointerType !== "pen" && e.cancelable) {
+      e.preventDefault();
+    }
 
     isDown = false;
     knob.classList.remove("isDown");
@@ -4180,18 +4180,25 @@ document.addEventListener("touchend", (e) => {
   }
 }, { passive: true });
 
-// Wheel: over visualizer do nothing (page scrolls normally). Else only prevent horizontal.
+// Wheel: never block normal scrolling; always prefer parent page scroll behavior.
 function isOnVisualizer(el) {
   if (!el) return false;
   return el.closest('.vizWrap') || el.closest('.viz3d') || el.tagName === 'CANVAS';
 }
 document.addEventListener("wheel", (e) => {
-  if (isOnVisualizer(e.target)) {
-    return; // Do not prevent - let parent page scroll normally
+  // If embedded in a parent page, forward vertical wheel directly to parent.
+  if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
+    try {
+      if (window.top && window.top !== window && typeof window.top.scrollBy === "function") {
+        e.preventDefault();
+        window.top.scrollBy({ top: e.deltaY, left: 0, behavior: "auto" });
+        return;
+      }
+    } catch (_) {
+      // Cross-origin parent access blocked; fall through without preventing default.
+    }
   }
-  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-    e.preventDefault();
-  }
+  // Never preventDefault here; keep scrolling behavior natural.
 }, { passive: false });
 
 updatePlayButton();
