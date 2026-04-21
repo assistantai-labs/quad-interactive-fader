@@ -21,7 +21,7 @@
       height: 100%;
       margin: 0;
       padding: 0;
-      background: transparent;
+      background: #000;
       overflow-x: hidden; /* kill sideways drag */
     }
 
@@ -39,6 +39,7 @@
     /* Wrapper to clamp horizontal overflow and prevent horizontal scroll */
     .iframe-wrapper {
       width: 100%;
+      background: #000;
       overflow-x: hidden;
       overscroll-behavior-x: none;
       position: relative;
@@ -105,6 +106,175 @@
       justify-content: center;
       padding: 12px 16px 16px;
       box-sizing: border-box;
+    }
+
+    .genreWrap {
+      --genre-dot-size: 10px;
+      --genre-end-inset: 20px;
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 0 20px 12px;
+      box-sizing: border-box;
+      touch-action: pan-y;
+    }
+
+    .genreTitle {
+      font-size: clamp(20px, 3vw, 34px);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.96);
+      text-shadow: 0 0 18px rgba(255,255,255,0.2);
+      user-select: none;
+      -webkit-user-select: none;
+      line-height: 1;
+      min-height: 1em;
+      transition: color 360ms ease, text-shadow 420ms ease, opacity 320ms ease, transform 320ms ease;
+      will-change: opacity, text-shadow, transform;
+    }
+
+    .genreRail {
+      width: min(690px, 72vw);
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 48%, rgba(255,255,255,0.08) 100%),
+        rgba(12,12,14,0.68);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      position: relative;
+      overflow: visible;
+      touch-action: pan-x;
+      user-select: none;
+      -webkit-user-select: none;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.14),
+        inset 0 -10px 20px rgba(0,0,0,0.24),
+        0 4px 14px rgba(0,0,0,0.28);
+      transition: box-shadow 260ms ease, border-color 260ms ease, background 260ms ease;
+    }
+
+    .genreRail::before {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 999px;
+      background: linear-gradient(115deg, rgba(255,255,255,0.01) 20%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.01) 80%);
+      opacity: 0.22;
+      filter: blur(0.4px);
+      transform: translateX(-18%);
+      animation: genreRailSheen 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .genreRail::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 6px;
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0));
+      opacity: 0.34;
+      pointer-events: none;
+    }
+
+    .genreKnob {
+      position: absolute;
+      top: 50%;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, rgba(255,255,255,1) 0%, rgba(255,255,255,0.97) 46%, rgba(232,239,255,0.9) 100%);
+      transform: translate(-50%, -50%);
+      box-shadow:
+        0 8px 22px rgba(0,0,0,0.34),
+        0 0 12px rgba(255,255,255,0.34),
+        inset 0 1px 1px rgba(255,255,255,0.85);
+      transition: left 220ms cubic-bezier(.2,.9,.2,1), transform 220ms cubic-bezier(.2,.9,.2,1), box-shadow 220ms ease;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .genreLabels {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 var(--genre-end-inset);
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      z-index: 2;
+    }
+
+    .genreLabel {
+      width: var(--genre-dot-size);
+      height: var(--genre-dot-size);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.4);
+      border: 1px solid rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+      box-shadow: 0 0 6px rgba(255,255,255,0.16);
+    }
+
+    .genreLabel.active {
+      background: #fff;
+      box-shadow: 0 0 10px rgba(255,255,255,0.52), 0 0 16px rgba(255,255,255,0.24);
+      transform: scale(1.18);
+    }
+
+    .genreWrap.genre-changing .genreTitle {
+      animation: genreTitleFlash 560ms cubic-bezier(.22,.75,.2,1);
+    }
+
+    .genreWrap.genre-changing .genreKnob {
+      transform: translate(-50%, -50%) scale(1.08);
+      box-shadow:
+        0 10px 24px rgba(0,0,0,0.34),
+        0 0 16px rgba(255,255,255,0.46),
+        inset 0 1px 1px rgba(255,255,255,0.9);
+    }
+
+    .genreWrap.genre-changing .genreRail {
+      border-color: rgba(255,255,255,0.24);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.18),
+        inset 0 -10px 22px rgba(0,0,0,0.24),
+        0 6px 18px rgba(0,0,0,0.3),
+        0 0 14px rgba(255,255,255,0.12);
+    }
+
+    @keyframes genreRailSheen {
+      0% { transform: translateX(-18%); opacity: 0.16; }
+      50% { transform: translateX(18%); opacity: 0.28; }
+      100% { transform: translateX(-18%); opacity: 0.16; }
+    }
+
+    @keyframes genreTitleFlash {
+      0% {
+        opacity: 0.82;
+        transform: translateY(0.5px);
+        text-shadow: 0 0 10px rgba(255,255,255,0.12);
+      }
+      42% {
+        opacity: 1;
+        transform: translateY(0);
+        text-shadow: 0 0 22px rgba(255,255,255,0.42), 0 0 34px rgba(255,255,255,0.16);
+      }
+      100% {
+        opacity: 0.98;
+        transform: translateY(0);
+        text-shadow: 0 0 16px rgba(255,255,255,0.2);
+      }
     }
 
     /* Legacy .stage class for backwards compatibility */
@@ -583,6 +753,13 @@
           </div>
         </div>
       </div>
+      <div class="genreWrap" id="genreWrap">
+        <div class="genreTitle" id="genreTitle">R&B</div>
+        <div class="genreRail" id="genreRail">
+          <div class="genreKnob" id="genreKnob"></div>
+          <div class="genreLabels" id="genreLabels"></div>
+        </div>
+      </div>
       <div class="controlsWrap">
         <div class="panel" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
@@ -632,12 +809,129 @@
    AUDIO
 ========================= */
 
-const FILES = {
-  rawVocals: "assets/audio/RAW_VOCALS.wav",
-  quadVocals: "assets/audio/QUAD_VOCALS.wav",
-  rawFull: "assets/audio/RAW_VOCALS_BEAT.wav",
-  quadFull: "assets/audio/QUAD_VOCALS_BEAT.wav",
-};
+const genreConfigs = [
+  {
+    label: "Melodic",
+    slug: "melodic",
+    assetFolder: "MELODIC",
+    enabled: true,
+    theme: { type: "gradient", colors: ["#00d4ff", "#0033ff"] },
+    files: {
+      rawVocals: "RAW VOCALS ONLY.wav",
+      mixedVocals: "MIXED VOCALS.wav",
+      rawVocalsWithBeat: "RAW VOCALS W BEAT.wav",
+      mixedVocalsWithBeat: "MIXED VOCALS W BEAT.wav",
+    },
+    notes: "",
+  },
+  {
+    label: "R&B",
+    slug: "rnb",
+    assetFolder: "__USE_CURRENT_WEBSITE_AUDIO__",
+    enabled: true,
+    theme: { type: "gradient", colors: ["#ff2d95", "#7a00ff"] },
+    files: {
+      rawVocals: "assets/audio/RAW_VOCALS.wav",
+      mixedVocals: "assets/audio/QUAD_VOCALS.wav",
+      rawVocalsWithBeat: "assets/audio/RAW_VOCALS_BEAT.wav",
+      mixedVocalsWithBeat: "assets/audio/QUAD_VOCALS_BEAT.wav",
+    },
+    notes: "Current website song",
+  },
+  {
+    label: "Trap",
+    slug: "trap",
+    assetFolder: "",
+    enabled: false,
+    theme: { type: "default", colors: [] },
+    files: { rawVocals: "", mixedVocals: "", rawVocalsWithBeat: "", mixedVocalsWithBeat: "" },
+    notes: "Disabled until assets are provided",
+  },
+  {
+    label: "Pop",
+    slug: "pop",
+    assetFolder: "POP",
+    enabled: true,
+    theme: { type: "gradient", colors: ["#ff5a00", "#ffe600"] },
+    files: {
+      rawVocals: "RAW VOCAL ONLY.wav",
+      mixedVocals: "MIXED VOCAL ONLY.wav",
+      rawVocalsWithBeat: "RAW VOCAL W BEAT.wav",
+      mixedVocalsWithBeat: "MIXED VOCAL W BEAT.wav",
+    },
+    notes: "",
+  },
+  {
+    label: "Bars",
+    slug: "bars",
+    assetFolder: "RAP",
+    enabled: true,
+    theme: { type: "gradient", colors: ["#7dff00", "#00ffd0"] },
+    files: {
+      rawVocals: "RAW VOCAL ONLY.wav",
+      mixedVocals: "MIXED VOCAL ONLY.wav",
+      rawVocalsWithBeat: "RAW VOCAL W BEAT.wav",
+      mixedVocalsWithBeat: "MIXED VOCAL W BEAT.wav",
+    },
+    notes: "Song title: Alone",
+  },
+  {
+    label: "Alternative",
+    slug: "alternative",
+    assetFolder: "ALTERNATIVE",
+    enabled: true,
+    theme: { type: "gradient", colors: ["#00ffd5", "#002bff"] },
+    files: {
+      rawVocals: "RAW VOCALS.wav",
+      mixedVocals: "MIXED VOCALS ONLY.wav",
+      rawVocalsWithBeat: "RAW VOCALS W BEAT.wav",
+      mixedVocalsWithBeat: "MIXED VOCALS W BEAT.wav",
+    },
+    notes: "",
+  },
+  {
+    label: "Rock",
+    slug: "rock",
+    assetFolder: "ROCK",
+    enabled: true,
+    theme: { type: "gradient", colors: ["#ff1b1b", "#ff8a00"] },
+    files: {
+      rawVocals: "RAW VOCALS ONLY.wav",
+      mixedVocals: "MIXED VOCALS ONLY.wav",
+      rawVocalsWithBeat: "RAW VOCALS W BEAT.wav",
+      mixedVocalsWithBeat: "MIXED VOCALS W BEAT.wav",
+    },
+    notes: "",
+  },
+];
+
+const activeGenres = genreConfigs.filter(g => g.enabled);
+let currentGenreIndex = Math.max(0, activeGenres.findIndex(g => g.slug === "rnb"));
+if (currentGenreIndex < 0) currentGenreIndex = 0;
+
+function pathJoin(...parts) {
+  return parts.join("/").replace(/\/{2,}/g, "/");
+}
+
+function buildFilesForGenre(genre) {
+  if (genre.assetFolder === "__USE_CURRENT_WEBSITE_AUDIO__") {
+    return {
+      rawVocals: genre.files.rawVocals,
+      quadVocals: genre.files.mixedVocals,
+      rawFull: genre.files.rawVocalsWithBeat,
+      quadFull: genre.files.mixedVocalsWithBeat,
+    };
+  }
+  const base = pathJoin("QUAD VISUALIZER AUDIO FILES", genre.assetFolder);
+  return {
+    rawVocals: pathJoin(base, genre.files.rawVocals),
+    quadVocals: pathJoin(base, genre.files.mixedVocals),
+    rawFull: pathJoin(base, genre.files.rawVocalsWithBeat),
+    quadFull: pathJoin(base, genre.files.mixedVocalsWithBeat),
+  };
+}
+
+let FILES = buildFilesForGenre(activeGenres[currentGenreIndex]);
 
 let audio = {
   ctx: null,
@@ -662,14 +956,27 @@ async function initAudio() {
 
 let visualizerHasData = false;
 let userHasInteracted = false;
+let loadingIndicatorTimeoutId = null;
 
 function showLoadingIndicator() {
   const indicator = document.getElementById('loadingIndicator');
-  if (indicator) indicator.classList.add('visible');
+  if (!indicator) return;
+  indicator.classList.add('visible');
+  if (loadingIndicatorTimeoutId) {
+    clearTimeout(loadingIndicatorTimeoutId);
+  }
+  // Failsafe: never let spinner stay forever.
+  loadingIndicatorTimeoutId = setTimeout(() => {
+    hideLoadingIndicator();
+  }, 8000);
 }
 
 function hideLoadingIndicator() {
   const indicator = document.getElementById('loadingIndicator');
+  if (loadingIndicatorTimeoutId) {
+    clearTimeout(loadingIndicatorTimeoutId);
+    loadingIndicatorTimeoutId = null;
+  }
   if (indicator) indicator.classList.remove('visible');
 }
 
@@ -683,35 +990,127 @@ function checkVisualizerData() {
   audio.analyser.getByteFrequencyData(audio.dataArray);
   
   // Check if there's any non-zero data
-  for (let i = 0; i < Math.min(100, audio.dataArray.length); i++) {
-    if (audio.dataArray[i] > 5) { // Threshold to account for noise
+  // Use a low threshold so quieter intros still clear loading state.
+  for (let i = 0; i < Math.min(256, audio.dataArray.length); i++) {
+    if (audio.dataArray[i] > 1) {
       return true;
     }
   }
   return false;
 }
 
-// Preload audio files (fetch only, don't decode until user interaction)
-let audioPreloadPromises = null;
+// Preload audio files (fetch bytes early), then decode/cache per genre on demand.
+const audioPreloadPromises = new Map();
+const decodedGenreBuffers = new Map();
+const decodeGenrePromises = new Map();
+const AUDIO_DECODE_TIMEOUT_MS = 45000;
+let sequentialGenreBuildStarted = false;
 
-function preloadAudioFiles() {
-  if (audioPreloadPromises) return audioPreloadPromises;
-  
-  audioPreloadPromises = Promise.all(
-    Object.entries(FILES).map(async ([key, filename]) => {
-      try {
-        const res = await fetch(filename);
-        if (!res.ok) throw new Error(`Missing file: ${filename}`);
-        const arr = await res.arrayBuffer();
-        return { key, arrayBuffer: arr };
-      } catch (err) {
-        console.error(`Failed to preload ${filename}:`, err);
-        throw err;
-      }
+function preloadAudioFiles(genre = activeGenres[currentGenreIndex]) {
+  if (!genre) return Promise.resolve([]);
+  if (audioPreloadPromises.has(genre.slug)) return audioPreloadPromises.get(genre.slug);
+  const files = buildFilesForGenre(genre);
+  const p = Promise.all(
+    Object.entries(files).map(async ([key, filename]) => {
+      const res = await fetchAudioFileFlexible(filename);
+      // Keep raw bytes so decode can be retried safely.
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      return { key, bytes };
     })
-  );
-  
-  return audioPreloadPromises;
+  ).catch((err) => {
+    // Allow retry if a preload fails once (network hiccup / stale path)
+    audioPreloadPromises.delete(genre.slug);
+    throw err;
+  });
+  audioPreloadPromises.set(genre.slug, p);
+  return p;
+}
+
+async function fetchAudioFileFlexible(filename) {
+  const candidates = [];
+  const pushUnique = (value) => {
+    if (value && !candidates.includes(value)) candidates.push(value);
+  };
+  pushUnique(filename);
+  try { pushUnique(encodeURI(filename)); } catch (_) {}
+  try { pushUnique(decodeURI(filename)); } catch (_) {}
+
+  let lastErr = null;
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return res;
+      lastErr = new Error(`HTTP ${res.status} for ${url}`);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error(`Missing file: ${filename}`);
+}
+
+async function decodeGenreBuffers(genre = activeGenres[currentGenreIndex]) {
+  if (!genre) return {};
+  if (!audio.ctx) {
+    throw new Error("Audio context not initialized");
+  }
+  if (decodedGenreBuffers.has(genre.slug)) {
+    return decodedGenreBuffers.get(genre.slug);
+  }
+  if (decodeGenrePromises.has(genre.slug)) {
+    return decodeGenrePromises.get(genre.slug);
+  }
+
+  const withTimeout = (promise, ms, label) => {
+    let timeoutId = null;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+    });
+  };
+
+  const p = (async () => {
+    const preloadedData = await preloadAudioFiles(genre);
+    const decoded = {};
+    // Decode sequentially for better reliability on mobile Safari.
+    for (const { key, bytes } of preloadedData) {
+      const decodeBuffer = bytes.slice().buffer;
+      decoded[key] = await withTimeout(
+        audio.ctx.decodeAudioData(decodeBuffer),
+        AUDIO_DECODE_TIMEOUT_MS,
+        `${genre.label} ${key} decode`
+      );
+    }
+    decodedGenreBuffers.set(genre.slug, decoded);
+    return decoded;
+  })().finally(() => {
+    decodeGenrePromises.delete(genre.slug);
+  });
+
+  decodeGenrePromises.set(genre.slug, p);
+  return p;
+}
+
+function preloadAllGenres() {
+  activeGenres.forEach((genre) => {
+    preloadAudioFiles(genre).catch((err) => {
+      console.warn(`Preload failed for ${genre.label}:`, err);
+    });
+  });
+}
+
+async function buildGenresOneByOne() {
+  if (sequentialGenreBuildStarted) return;
+  if (!audio.ctx) return;
+  sequentialGenreBuildStarted = true;
+  for (const genre of activeGenres) {
+    try {
+      await decodeGenreBuffers(genre);
+    } catch (err) {
+      console.warn(`Sequential build failed for ${genre.label}:`, err);
+    }
+  }
 }
 
 async function loadBuffers() {
@@ -721,28 +1120,12 @@ async function loadBuffers() {
     showLoadingIndicator();
   }
   try {
-    // Use preloaded files if available, otherwise fetch in parallel
-    let preloadedData;
-    if (audioPreloadPromises) {
-      preloadedData = await audioPreloadPromises;
-    } else {
-      // Fallback: fetch in parallel if preload didn't happen
-      preloadedData = await Promise.all(
-        Object.entries(FILES).map(async ([key, filename]) => {
-          const res = await fetch(filename);
-          if (!res.ok) throw new Error(`Missing file: ${filename}`);
-          const arr = await res.arrayBuffer();
-          return { key, arrayBuffer: arr };
-        })
-      );
-    }
-    
-    // Decode all audio buffers in parallel - no unnecessary validation
-    await Promise.all(
-      preloadedData.map(async ({ key, arrayBuffer }) => {
-        audio.buffers[key] = await audio.ctx.decodeAudioData(arrayBuffer);
-      })
-    );
+    const activeGenre = activeGenres[currentGenreIndex];
+    const decoded = await decodeGenreBuffers(activeGenre);
+    audio.buffers = { ...decoded };
+  } catch (err) {
+    hideLoadingIndicator();
+    throw err;
   } finally {
     audio.loading = false;
     // Don't hide loading here - wait for visualizer to have data
@@ -854,6 +1237,11 @@ async function ensureStarted() {
   audio.started = true;
   audio.playing = true;
   updatePlayButton();
+
+  // Build every genre one-by-one in background for reliable live switching.
+  setTimeout(() => {
+    buildGenresOneByOne().catch(() => {});
+  }, 0);
 }
 
 async function play() {
@@ -867,6 +1255,7 @@ async function pause() {
   if (!audio.ctx) return;
   await audio.ctx.suspend();
   audio.playing = false;
+  hideLoadingIndicator();
   updatePlayButton();
 }
 
@@ -887,6 +1276,97 @@ function updatePlayButton() {
   }
   
   btn.textContent = audio.playing ? "PAUSE" : "PLAY";
+}
+
+function stopAndResetAudioGraph() {
+  Object.values(audio.sources).forEach(src => {
+    try { src.stop(0); } catch (_) {}
+    try { src.disconnect(); } catch (_) {}
+  });
+  Object.values(audio.gains).forEach(g => {
+    try { g.disconnect(); } catch (_) {}
+  });
+  if (audio.analyser) {
+    try { audio.analyser.disconnect(); } catch (_) {}
+  }
+  if (audio.masterGain) {
+    try { audio.masterGain.disconnect(); } catch (_) {}
+  }
+  audio.buffers = {};
+  audio.sources = {};
+  audio.gains = {};
+  audio.analyser = null;
+  audio.masterGain = null;
+  audio.dataArray = null;
+  audio.started = false;
+  audio.playing = false;
+}
+
+async function switchGenre(nextIndex) {
+  const safeIndex = Math.max(0, Math.min(activeGenres.length - 1, nextIndex));
+  if (safeIndex === currentGenreIndex) return;
+  const prevIndex = currentGenreIndex;
+  const nextGenre = activeGenres[safeIndex];
+  const prevGenre = activeGenres[prevIndex];
+  const prevFiles = FILES;
+  preloadAudioFiles(nextGenre).catch(() => {});
+  const wasPlaying = audio.playing && audio.ctx && audio.ctx.state === "running";
+  let didResetGraph = false;
+  try {
+    visualizerHasData = false;
+    if (userHasInteracted) showLoadingIndicator();
+    // Make sure next genre is actually decodable before we tear down current playback.
+    if (audio.ctx) {
+      await decodeGenreBuffers(nextGenre);
+    }
+    currentGenreIndex = safeIndex;
+    FILES = buildFilesForGenre(nextGenre);
+    stopAndResetAudioGraph();
+    didResetGraph = true;
+    if (wasPlaying) {
+      await play();
+      applyMix();
+    } else {
+      updatePlayButton();
+    }
+  } catch (err) {
+    console.warn("Genre switch failed, reverting:", err);
+    currentGenreIndex = prevIndex;
+    FILES = prevFiles || buildFilesForGenre(prevGenre);
+    if (didResetGraph) {
+      stopAndResetAudioGraph();
+    }
+    hideLoadingIndicator();
+    updatePlayButton();
+  }
+}
+
+let genreSwitchInFlight = false;
+let queuedGenreIndex = null;
+
+async function requestGenreChange(nextIndex) {
+  const safeIndex = Math.max(0, Math.min(activeGenres.length - 1, nextIndex));
+  if (safeIndex === currentGenreIndex && !genreSwitchInFlight) return;
+  if (genreSwitchInFlight) {
+    queuedGenreIndex = safeIndex;
+    return;
+  }
+
+  genreSwitchInFlight = true;
+  try {
+    await switchGenre(safeIndex);
+  } catch (err) {
+    console.warn("Genre change request failed:", err);
+  } finally {
+    genreSwitchInFlight = false;
+    if (queuedGenreIndex !== null && queuedGenreIndex !== currentGenreIndex) {
+      const pending = queuedGenreIndex;
+      queuedGenreIndex = null;
+      await requestGenreChange(pending);
+    } else {
+      queuedGenreIndex = null;
+    }
+  }
 }
 
 /* =========================
@@ -2310,6 +2790,7 @@ async function onFirstInteract(){
     updatePlayButton();
   } catch (err) {
     console.error(err);
+    hideLoadingIndicator();
     updatePlayButton();
   }
 }
@@ -2344,6 +2825,7 @@ btnPlay.addEventListener("click", async (e) => {
     updatePlayButton();
   } catch (err){
     console.error(err);
+    hideLoadingIndicator();
     updatePlayButton();
   }
 }, { passive:false });
@@ -2377,6 +2859,7 @@ window.addEventListener("keydown", async (e) => {
     }
     updatePlayButton();
   } catch {
+    hideLoadingIndicator();
     updatePlayButton();
   }
 }, { passive:false });
@@ -2559,6 +3042,122 @@ const sliderBlend = makeSlider({
 
 tone = sliderTone.value;
 blend = sliderBlend.value;
+setupGenreSelector();
+
+function setupGenreSelector() {
+  const wrap = document.getElementById("genreWrap");
+  const rail = document.getElementById("genreRail");
+  const knob = document.getElementById("genreKnob");
+  const labels = document.getElementById("genreLabels");
+  const title = document.getElementById("genreTitle");
+  if (!wrap || !rail || !knob || !labels || !title) return;
+  labels.innerHTML = "";
+  activeGenres.forEach((genre, idx) => {
+    const label = document.createElement("div");
+    label.className = "genreLabel" + (idx === currentGenreIndex ? " active" : "");
+    label.setAttribute("role", "button");
+    label.setAttribute("aria-label", `Select ${genre.label}`);
+    label.setAttribute("title", genre.label);
+    label.addEventListener("click", async () => {
+      await requestGenreChange(idx);
+      renderGenreSelector();
+    });
+    labels.appendChild(label);
+  });
+
+  let previewIndex = currentGenreIndex;
+  let lastCommittedGenreIndex = currentGenreIndex;
+  let genreFxTimeout = null;
+  const triggerGenreChangeFx = () => {
+    wrap.classList.remove("genre-changing");
+    if (genreFxTimeout) clearTimeout(genreFxTimeout);
+    // Restart animation reliably on every committed genre change
+    void wrap.offsetWidth;
+    wrap.classList.add("genre-changing");
+    genreFxTimeout = setTimeout(() => {
+      wrap.classList.remove("genre-changing");
+      genreFxTimeout = null;
+    }, 280);
+  };
+  const getGenreEndInsetPx = () => {
+    // Match the exact horizontal stop range used by the RAW/MIXED slider knob.
+    const toneWrap = document.getElementById("wrapTone");
+    if (toneWrap) {
+      const toneStyle = window.getComputedStyle(toneWrap);
+      const leftPad = parseFloat(toneStyle.paddingLeft);
+      if (Number.isFinite(leftPad)) {
+        return leftPad;
+      }
+    }
+    return 20;
+  };
+
+  const renderGenreSelector = (renderIndex = currentGenreIndex) => {
+    const count = Math.max(1, activeGenres.length - 1);
+    const ratio = renderIndex / count;
+    const insetPx = getGenreEndInsetPx();
+    labels.style.paddingLeft = `${insetPx}px`;
+    labels.style.paddingRight = `${insetPx}px`;
+    knob.style.left = `calc(${insetPx}px + (${ratio} * (100% - ${insetPx * 2}px)))`;
+    if (renderIndex === currentGenreIndex && currentGenreIndex !== lastCommittedGenreIndex) {
+      triggerGenreChangeFx();
+      lastCommittedGenreIndex = currentGenreIndex;
+    }
+    if (renderIndex === currentGenreIndex) {
+      lastRequestedIndex = currentGenreIndex;
+    }
+    title.textContent = (activeGenres[currentGenreIndex]?.label || "").toUpperCase();
+    labels.querySelectorAll(".genreLabel").forEach((el, i) => {
+      el.classList.toggle("active", i === renderIndex);
+    });
+  };
+
+  let dragging = false;
+  let lastRequestedIndex = currentGenreIndex;
+  const getIndexFromEvent = (clientX) => {
+    const rect = rail.getBoundingClientRect();
+    const insetPx = getGenreEndInsetPx();
+    const minX = insetPx;
+    const maxX = Math.max(insetPx, rect.width - insetPx);
+    const x = Math.max(minX, Math.min(maxX, clientX - rect.left));
+    const ratio = rect.width > insetPx * 2 ? (x - insetPx) / (rect.width - insetPx * 2) : 0;
+    return Math.round(ratio * (activeGenres.length - 1));
+  };
+
+  const start = (e) => {
+    dragging = true;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    previewIndex = getIndexFromEvent(x);
+    renderGenreSelector(previewIndex);
+    if (previewIndex !== lastRequestedIndex) {
+      lastRequestedIndex = previewIndex;
+      requestGenreChange(previewIndex).then(renderGenreSelector);
+    }
+  };
+  const move = (e) => {
+    if (!dragging) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    previewIndex = getIndexFromEvent(x);
+    renderGenreSelector(previewIndex);
+    if (previewIndex !== lastRequestedIndex) {
+      lastRequestedIndex = previewIndex;
+      requestGenreChange(previewIndex).then(renderGenreSelector);
+    }
+  };
+  const end = async () => {
+    if (!dragging) return;
+    dragging = false;
+    renderGenreSelector();
+  };
+  rail.addEventListener("pointerdown", start, { passive: true });
+  window.addEventListener("pointermove", move, { passive: true });
+  window.addEventListener("pointerup", end, { passive: true });
+  rail.addEventListener("touchstart", start, { passive: true });
+  rail.addEventListener("touchmove", move, { passive: true });
+  rail.addEventListener("touchend", end, { passive: true });
+  window.addEventListener("resize", () => renderGenreSelector(), { passive: true });
+  renderGenreSelector();
+}
 
 // Continuous check for completion burst (runs every frame after sliders are created)
 function completionBurstLoop() {
@@ -2878,6 +3477,58 @@ setTimeout(() => {
     outColor.r = gray + (finalColor.r - gray) * litFactor;
     outColor.g = gray + (finalColor.g - gray) * litFactor;
     outColor.b = gray + (finalColor.b - gray) * litFactor;
+
+    // Genre-specific visualizer color treatment (intentionally strong per genre)
+    const genreTheme = activeGenres[currentGenreIndex]?.theme;
+    if (genreTheme) {
+      const clamp01 = (v) => Math.max(0, Math.min(1, v));
+      const boost = 0.25 + energy * 0.35;
+      const parseHexColor = (hex) => {
+        const clean = (hex || "").replace("#", "");
+        if (clean.length !== 6) return { r: 0, g: 0, b: 0 };
+        return {
+          r: parseInt(clean.substring(0, 2), 16) / 255,
+          g: parseInt(clean.substring(2, 4), 16) / 255,
+          b: parseInt(clean.substring(4, 6), 16) / 255,
+        };
+      };
+
+      if (genreTheme.type === "solid" && genreTheme.colors?.length) {
+        const t = parseHexColor(genreTheme.colors[0]);
+        const amt = 0.78;
+        outColor.r = outColor.r * (1 - amt) + t.r * amt;
+        outColor.g = outColor.g * (1 - amt) + t.g * amt;
+        outColor.b = outColor.b * (1 - amt) + t.b * amt;
+      } else if (genreTheme.type === "gradient" && genreTheme.colors?.length >= 2) {
+        const c0 = parseHexColor(genreTheme.colors[0]);
+        const c1 = parseHexColor(genreTheme.colors[1]);
+        const t = Math.max(0, Math.min(1, energy * 0.65 + vocalBeat * 0.35));
+        const tr = c0.r + (c1.r - c0.r) * t;
+        const tg = c0.g + (c1.g - c0.g) * t;
+        const tb = c0.b + (c1.b - c0.b) * t;
+        const amt = 0.72;
+        outColor.r = outColor.r * (1 - amt) + tr * amt;
+        outColor.g = outColor.g * (1 - amt) + tg * amt;
+        outColor.b = outColor.b * (1 - amt) + tb * amt;
+      } else if (genreTheme.type === "rainbow") {
+        const phase = (performance.now() * 0.0005 + energy * 1.2 + rawMix * 0.35) % 1;
+        const tr = 0.45 + 0.55 * Math.sin((phase + 0.00) * Math.PI * 2);
+        const tg = 0.45 + 0.55 * Math.sin((phase + 0.33) * Math.PI * 2);
+        const tb = 0.45 + 0.55 * Math.sin((phase + 0.66) * Math.PI * 2);
+        const amt = 0.64;
+        outColor.r = outColor.r * (1 - amt) + tr * amt;
+        outColor.g = outColor.g * (1 - amt) + tg * amt;
+        outColor.b = outColor.b * (1 - amt) + tb * amt;
+      }
+
+      // Extra contrast/saturation push so genre swaps feel dramatic instantly.
+      const maxCh = Math.max(outColor.r, outColor.g, outColor.b);
+      const minCh = Math.min(outColor.r, outColor.g, outColor.b);
+      const mid = (maxCh + minCh) * 0.5;
+      outColor.r = clamp01((outColor.r - mid) * (1.35 + boost) + mid + boost * 0.08);
+      outColor.g = clamp01((outColor.g - mid) * (1.35 + boost) + mid + boost * 0.08);
+      outColor.b = clamp01((outColor.b - mid) * (1.35 + boost) + mid + boost * 0.08);
+    }
     
     return outColor;
   }
@@ -3211,7 +3862,7 @@ setTimeout(() => {
   function animate() {
     requestAnimationFrame(animate);
     
-    // Camera only moves via preset angle buttons (no user drag)
+    // Camera smoothly eases toward fixed target position
     {
       // Smoothly move camera toward target angle
       currentCameraPos.lerp(targetCameraPos, 0.05); // Smooth lerp to target position
@@ -3302,10 +3953,8 @@ let scrollOverlay = null;
 // Initialize scroll overlay and start preloading audio
 document.addEventListener('DOMContentLoaded', () => {
   scrollOverlay = document.getElementById('scrollOverlay');
-  // Start preloading audio files immediately (fetch only, decode happens on user interaction)
-  preloadAudioFiles().catch(err => {
-    console.warn('Audio preload failed (will retry on play):', err);
-  });
+  // Start preloading all enabled genres immediately for faster switches.
+  preloadAllGenres();
 });
 
 // Check if target is an interactive element (slider, button, etc.)
@@ -3315,6 +3964,9 @@ function isInteractiveElement(target) {
   // Check if it's a slider element
   const trackWrap = target.closest('.trackWrap');
   if (trackWrap) return true;
+
+  // Genre selector rail/dots/title should remain interactive (no scroll overlay capture)
+  if (target.closest('#genreWrap') || target.closest('#genreRail') || target.closest('.genreLabel')) return true;
   
   // Check if it's a button
   if (target.closest('button') || target.tagName === 'BUTTON') return true;
@@ -3441,10 +4093,8 @@ document.addEventListener("wheel", (e) => {
 updatePlayButton();
 
 // Start preloading audio files immediately on page load
-// This allows files to start downloading as soon as possible, reducing load time when user clicks play
-preloadAudioFiles().catch(err => {
-  console.warn('Early audio preload failed (will retry on play):', err);
-});
+// This allows files to start downloading as soon as possible, reducing load time when user clicks play.
+preloadAllGenres();
 
 // Profile badge: hide if image missing, fade in if loaded
 (function(){
