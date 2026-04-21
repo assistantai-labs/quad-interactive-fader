@@ -140,10 +140,8 @@
       width: min(690px, 72vw);
       height: 42px;
       border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 48%, rgba(255,255,255,0.08) 100%),
-        rgba(12,12,14,0.68);
+      border: 1px solid rgba(255,255,255,0.9);
+      background: #000;
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       position: relative;
@@ -152,8 +150,7 @@
       user-select: none;
       -webkit-user-select: none;
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.14),
-        inset 0 -10px 20px rgba(0,0,0,0.24),
+        inset 0 1px 0 rgba(255,255,255,0.06),
         0 4px 14px rgba(0,0,0,0.28);
       transition: box-shadow 260ms ease, border-color 260ms ease, background 260ms ease;
     }
@@ -163,8 +160,8 @@
       position: absolute;
       inset: 3px;
       border-radius: 999px;
-      background: linear-gradient(115deg, rgba(255,255,255,0.01) 20%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.01) 80%);
-      opacity: 0.22;
+      background: linear-gradient(115deg, rgba(255,255,255,0.0) 20%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.0) 80%);
+      opacity: 0.14;
       filter: blur(0.4px);
       transform: translateX(-18%);
       animation: genreRailSheen 8s ease-in-out infinite;
@@ -179,23 +176,20 @@
       top: 6px;
       height: 10px;
       border-radius: 999px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0));
-      opacity: 0.34;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0));
+      opacity: 0.2;
       pointer-events: none;
     }
 
     .genreKnob {
       position: absolute;
       top: 50%;
-      width: 32px;
-      height: 32px;
+      width: var(--knob);
+      height: var(--knob);
       border-radius: 50%;
-      background: radial-gradient(circle at 35% 30%, rgba(255,255,255,1) 0%, rgba(255,255,255,0.97) 46%, rgba(232,239,255,0.9) 100%);
+      background: #fff;
       transform: translate(-50%, -50%);
-      box-shadow:
-        0 8px 22px rgba(0,0,0,0.34),
-        0 0 12px rgba(255,255,255,0.34),
-        inset 0 1px 1px rgba(255,255,255,0.85);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.35);
       transition: left 220ms cubic-bezier(.2,.9,.2,1), transform 220ms cubic-bezier(.2,.9,.2,1), box-shadow 220ms ease;
       pointer-events: none;
       z-index: 3;
@@ -402,7 +396,7 @@
       background: rgba(0,0,0,0.55);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
-      border: 1px solid rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.9);
       box-shadow: 0 18px 50px rgba(0,0,0,0.55);
       padding: 14px 26px 14px; /* Very tight vertical padding */
       box-sizing: border-box;
@@ -3101,16 +3095,12 @@ function setupGenreSelector() {
     return true;
   };
   const getGenreEndInsetPx = () => {
-    // Match the exact horizontal stop range used by the RAW/MIXED slider knob.
-    const toneWrap = document.getElementById("wrapTone");
-    if (toneWrap) {
-      const toneStyle = window.getComputedStyle(toneWrap);
-      const leftPad = parseFloat(toneStyle.paddingLeft);
-      if (Number.isFinite(leftPad)) {
-        return leftPad;
-      }
+    // Place knob center exactly at each rounded rail end-cap center.
+    const rect = rail.getBoundingClientRect();
+    if (rect && rect.height > 0) {
+      return rect.height * 0.5;
     }
-    return 20;
+    return 21; // fallback for 42px rail height
   };
 
   const renderGenreSelector = (renderIndex = currentGenreIndex) => {
