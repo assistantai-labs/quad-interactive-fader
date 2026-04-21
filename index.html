@@ -456,6 +456,10 @@
       overflow: visible; /* Allow knobs to extend beyond row bounds */
     }
 
+    .panel.single-slider .rows {
+      padding: 10px 0 14px;
+    }
+
     .row {
       display: grid;
       grid-template-rows: auto auto;
@@ -541,12 +545,13 @@
     }
 
     .controls {
-      display: flex;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
       align-items: center;
+      column-gap: 14px;
       padding-top: 0px; /* Minimal spacing from rows above */
       padding-bottom: 0;
-      margin-top: -10px; /* Negative margin to pull button up further */
+      margin-top: -4px;
       margin-left: 0;
       margin-right: 0;
       margin-bottom: 0;
@@ -556,11 +561,17 @@
       width: 100%; /* Ensure full width for centering */
     }
 
+    .controlsSpacer {
+      width: 100%;
+      min-width: 120px;
+      height: 1px;
+    }
+
     .btn {
       height: var(--btnH);
       width: var(--btnW);
       border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.9);
       background: rgba(255,255,255,0.08);
       color: #fff;
       font-size: var(--text);
@@ -575,13 +586,69 @@
       -webkit-tap-highlight-color: transparent;
       transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
       font-family: inherit;
-      margin: 0 auto; /* Ensure button is centered */
+      margin: 0;
+      justify-self: center;
     }
 
     .btn:active {
       transform: scale(1.03);
       background: rgba(255,255,255,0.12);
       border-color: rgba(255,255,255,0.28);
+    }
+
+    .beatControl {
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+    }
+
+    .beatLabel {
+      font-size: clamp(11px, 1.3vw, 13px);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.92);
+      line-height: 1;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .beatToggle {
+      width: 54px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 14px rgba(0,0,0,0.32);
+      position: relative;
+      padding: 0;
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .beatToggle .beatToggleKnob {
+      position: absolute;
+      top: 50%;
+      left: 3px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      transform: translateY(-50%);
+      background: #fff;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+      transition: left 170ms cubic-bezier(.2,.9,.2,1), box-shadow 170ms ease;
+      pointer-events: none;
+    }
+
+    .beatToggle.is-on {
+      border-color: rgba(255,255,255,0.85);
+      background: rgba(255,255,255,0.14);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 8px 18px rgba(0,0,0,0.34);
+    }
+
+    .beatToggle.is-on .beatToggleKnob {
+      left: calc(100% - 25px);
     }
 
     /* Loading indicator */
@@ -755,14 +822,14 @@
         </div>
       </div>
       <div class="controlsWrap">
-        <div class="panel" id="panel">
+        <div class="panel single-slider" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
 
 
       <div class="rows">
         <div class="row" data-slider="tone">
           <div class="labels">
-            <div>RAW</div>
+            <div>UNMIXED</div>
             <div>MIXED</div>
           </div>
 
@@ -773,24 +840,17 @@
             <div class="knob" id="knobTone" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"></div>
           </div>
         </div>
-
-        <div class="row" data-slider="blend">
-          <div class="labels">
-            <div>VOCALS</div>
-            <div>BEAT</div>
-          </div>
-
-          <div class="trackWrap" id="wrapBlend" aria-label="Vocals Beat Slider">
-            <div class="track">
-              <div class="trackGlow" id="glowBlend"></div>
-            </div>
-            <div class="knob" id="knobBlend" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"></div>
-          </div>
-        </div>
       </div>
 
           <div class="controls">
+            <div class="controlsSpacer" aria-hidden="true"></div>
             <button class="btn" id="btnPlay">PLAY</button>
+            <div class="beatControl">
+              <span class="beatLabel">BEAT</span>
+              <button class="beatToggle is-on" id="beatToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle beat">
+                <span class="beatToggleKnob"></span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1185,12 +1245,8 @@ function buildGraph() {
   }
 }
 
-function setMix(tone, blend) {
+function setMix(tone, beatOn) {
   tone = Math.min(1, Math.max(0, tone));
-  blend = Math.min(1, Math.max(0, blend));
-
-  const vocalsLayer = (1 - blend);
-  const fullLayer = blend;
   const rawPart = (1 - tone);
   const quadPart = tone;
 
@@ -1204,11 +1260,18 @@ function setMix(tone, blend) {
 
   if (!audio.gains.rawVocals) return;
 
-  // Smooth fading between tracks
-  setGain(audio.gains.rawVocals, vocalsLayer * rawPart);
-  setGain(audio.gains.quadVocals, vocalsLayer * quadPart);
-  setGain(audio.gains.rawFull, fullLayer * rawPart);
-  setGain(audio.gains.quadFull, fullLayer * quadPart);
+  // One continuous mix slider + one binary beat toggle.
+  if (beatOn) {
+    setGain(audio.gains.rawVocals, 0);
+    setGain(audio.gains.quadVocals, 0);
+    setGain(audio.gains.rawFull, rawPart);
+    setGain(audio.gains.quadFull, quadPart);
+  } else {
+    setGain(audio.gains.rawVocals, rawPart);
+    setGain(audio.gains.quadVocals, quadPart);
+    setGain(audio.gains.rawFull, 0);
+    setGain(audio.gains.quadFull, 0);
+  }
 }
 
 async function ensureStarted() {
@@ -2760,11 +2823,11 @@ const panelFx = makePanelFx(document.getElementById("panelFx"), panelEl);
 const btnPlay = document.getElementById("btnPlay");
 
 let tone = 0;
-let blend = 0;
+let beatOn = true;
 
 function applyMix(){
   if (!audio.ctx) return;
-  setMix(tone, blend);
+  setMix(tone, beatOn);
 }
 
 let firstGestureDone = false;
@@ -2858,7 +2921,7 @@ window.addEventListener("keydown", async (e) => {
 }, { passive:false });
 
 function bothRight(){
-  return (tone >= 0.999) && (blend >= 0.999);
+  return (tone >= 0.999) && beatOn;
 }
 
 let lastBothRight = false;
@@ -2877,9 +2940,7 @@ function checkReward(){
 
 let completionBurstState = {
   toneMet: false,
-  blendMet: false,
   toneMetTime: 0,
-  blendMetTime: 0,
   lastTriggerTime: 0
 };
 
@@ -2888,15 +2949,14 @@ const COMPLETION_HOLD_TIME = 150; // ms
 const COMPLETION_RESET_THRESHOLD = 0.97;
 
 function checkCompletionBurst() {
-  // Only check if sliders exist
-  if (!sliderTone || !sliderBlend) return;
+  // Only check if top slider exists
+  if (!sliderTone) return;
   
   const now = performance.now();
   // Use display values for continuous checking during dragging (read-only)
   const toneDisplay = sliderTone.getDisplayValue();
-  const blendDisplay = sliderBlend.getDisplayValue();
   const toneMet = toneDisplay >= COMPLETION_THRESHOLD;
-  const blendMet = blendDisplay >= COMPLETION_THRESHOLD;
+  const beatMet = beatOn;
   
   // Track when each slider reaches threshold
   if (toneMet && !completionBurstState.toneMet) {
@@ -2907,29 +2967,17 @@ function checkCompletionBurst() {
     completionBurstState.toneMetTime = 0;
   }
   
-  if (blendMet && !completionBurstState.blendMet) {
-    completionBurstState.blendMet = true;
-    completionBurstState.blendMetTime = now;
-  } else if (!blendMet) {
-    completionBurstState.blendMet = false;
-    completionBurstState.blendMetTime = 0;
-  }
-  
-  // Check if both have been met for required duration
+  // Check if both controls are in completion state for required duration
   const bothMetForDuration = 
     completionBurstState.toneMet && 
-    completionBurstState.blendMet &&
+    beatMet &&
     completionBurstState.toneMetTime > 0 &&
-    completionBurstState.blendMetTime > 0 &&
-    (now - completionBurstState.toneMetTime) >= COMPLETION_HOLD_TIME &&
-    (now - completionBurstState.blendMetTime) >= COMPLETION_HOLD_TIME;
+    (now - completionBurstState.toneMetTime) >= COMPLETION_HOLD_TIME;
   
   // Reset tracking if sliders drop below reset threshold (allows retrigger)
-  if (toneDisplay < COMPLETION_RESET_THRESHOLD || blendDisplay < COMPLETION_RESET_THRESHOLD) {
+  if (toneDisplay < COMPLETION_RESET_THRESHOLD || !beatOn) {
     completionBurstState.toneMet = false;
-    completionBurstState.blendMet = false;
     completionBurstState.toneMetTime = 0;
-    completionBurstState.blendMetTime = 0;
   }
   
   // Trigger if conditions met (no cooldown - allows repeated triggers)
@@ -2950,7 +2998,6 @@ function checkCompletionBurst() {
   } else {
     // Reset tracking when sliders move away
     completionBurstState.toneMetTime = 0;
-    completionBurstState.blendMetTime = 0;
   }
 }
 
@@ -2972,30 +3019,6 @@ function slingshotLandFX({ strength, dest, wrap, pullDistance, knob }){
   panelFx.extravagantBurst(x, y, strength, trackWidth, pullDistance, knob);
 }
 
-function eggPullAllowed(){
-  // ONLY when both sliders right
-  return bothRight();
-}
-
-function eggFire({ wrap, knob }){
-  // "slingshot upwards into the top of the screen" + raining white dots
-  // animate knob upward (visual only), then restore
-  knob.style.transition = "transform 420ms cubic-bezier(.2,1.2,.2,1), top 420ms cubic-bezier(.2,1.2,.2,1)";
-  knob.style.transform = "translate(-50%, -50%) scale(1.0) translateY(-340px)";
-  setTimeout(() => {
-    knob.style.transition = "";
-    knob.style.transform = "translate(-50%, -50%)";
-  }, 460);
-
-  // Start rain + big burst at top
-  panelFx.startRain();
-  const pr = panelEl.getBoundingClientRect();
-  // Get track width from one of the sliders for speed calculation
-  const trackWidth = document.getElementById("wrapTone")?.getBoundingClientRect().width || pr.width * 0.8;
-  // Use default pull distance for egg fire
-  panelFx.extravagantBurst(pr.width * 0.5 + 40, 20, 1.0, trackWidth, 0.12, knob);
-}
-
 const sliderTone = makeSlider({
   wrap: document.getElementById("wrapTone"),
   knob: document.getElementById("knobTone"),
@@ -3012,29 +3035,35 @@ const sliderTone = makeSlider({
   }
 });
 
-const sliderBlend = makeSlider({
-  wrap: document.getElementById("wrapBlend"),
-  knob: document.getElementById("knobBlend"),
-  glow: document.getElementById("glowBlend"),
-  initial: 0,
-  snapDist: 0.20, // Twice as big - doubled snap distance
-  onFirstInteract,
-  onSlingshot: slingshotFX,
-  onSlingshotLand: slingshotLandFX,
+const beatToggleBtn = document.getElementById("beatToggle");
 
-  verticalEgg: true,
-  canEggPull: eggPullAllowed,
-  onEggFire: eggFire,
+function updateBeatToggleUI() {
+  if (!beatToggleBtn) return;
+  beatToggleBtn.classList.toggle("is-on", beatOn);
+  beatToggleBtn.setAttribute("aria-checked", beatOn ? "true" : "false");
+}
 
-  onChange: (v) => {
-    blend = v;
-    if (audio.started) applyMix();
-    checkReward();
+function setBeatState(nextValue, fromUser = false) {
+  beatOn = !!nextValue;
+  updateBeatToggleUI();
+  if (fromUser) {
+    userHasInteracted = true;
+    onFirstInteract();
   }
-});
+  if (audio.started) {
+    applyMix();
+  }
+  checkReward();
+}
+
+if (beatToggleBtn) {
+  beatToggleBtn.addEventListener("click", () => {
+    setBeatState(!beatOn, true);
+  }, { passive: true });
+}
 
 tone = sliderTone.value;
-blend = sliderBlend.value;
+setBeatState(true, false);
 setupGenreSelector();
 
 function setupGenreSelector() {
@@ -3608,8 +3637,8 @@ setTimeout(() => {
   }
   
   function getVocalBeat() {
-    // VOCALS (0) → BEAT (1)
-    return Math.max(0, Math.min(1, blend));
+    // Binary beat control: OFF (0) or ON (1)
+    return beatOn ? 1 : 0;
   }
   
   // Step 4: Check and trigger reward effect
@@ -3682,11 +3711,10 @@ setTimeout(() => {
   }
   
   function mixAmount() {
-    // Legacy function for backward compatibility
-    // Give more weight to RAW/MIXED slider (rawMix) than VOCALS/BEAT slider (vocalBeat)
+    // Legacy helper for visualizer impulse weighting with binary beat state.
     const rawMix = getRawMix();
     const vocalBeat = getVocalBeat();
-    return Math.max(0, Math.min(1, rawMix * 0.7 + vocalBeat * 0.3));
+    return Math.max(0, Math.min(1, rawMix * 0.75 + vocalBeat * 0.25));
   }
   
   function updateImpulse() {
