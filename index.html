@@ -457,7 +457,7 @@
     }
 
     .panel.single-slider .rows {
-      padding: 10px 0 14px;
+      padding: 12px 0 16px;
     }
 
     .row {
@@ -550,12 +550,12 @@
 
     .controls {
       display: grid;
-      grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+      grid-template-columns: minmax(132px, 1fr) auto minmax(132px, 1fr);
       align-items: center;
-      column-gap: 14px;
+      column-gap: 18px;
       padding-top: 0px; /* Minimal spacing from rows above */
       padding-bottom: 0;
-      margin-top: -4px;
+      margin-top: -2px;
       margin-left: 0;
       margin-right: 0;
       margin-bottom: 0;
@@ -567,7 +567,7 @@
 
     .controlsSpacer {
       width: 100%;
-      min-width: 120px;
+      min-width: 132px;
       height: 1px;
     }
 
@@ -604,13 +604,13 @@
       justify-self: end;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      min-width: 120px;
+      gap: 12px;
+      min-width: 132px;
     }
 
     .beatLabel {
       font-size: clamp(11px, 1.3vw, 13px);
-      letter-spacing: 0.16em;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
       color: rgba(255,255,255,0.92);
       line-height: 1;
@@ -629,6 +629,12 @@
       padding: 0;
       cursor: pointer;
       transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    /* Optical endpoint framing for single remaining top slider */
+    .panel.single-slider .row[data-slider="tone"] .trackWrap {
+      padding-left: calc(var(--endPad) + 1px);
+      padding-right: calc(var(--endPad) + 3px);
     }
 
     .beatToggle .beatToggleKnob {
