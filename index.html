@@ -754,7 +754,7 @@
         </div>
       </div>
       <div class="genreWrap" id="genreWrap">
-        <div class="genreTitle" id="genreTitle">R&B</div>
+        <div class="genreTitle" id="genreTitle">MELODIC</div>
         <div class="genreRail" id="genreRail">
           <div class="genreKnob" id="genreKnob"></div>
           <div class="genreLabels" id="genreLabels"></div>
@@ -815,7 +815,7 @@ const genreConfigs = [
     slug: "melodic",
     assetFolder: "MELODIC",
     enabled: true,
-    theme: { type: "gradient", colors: ["#00d4ff", "#0033ff"] },
+    theme: { type: "gradient", colors: ["#5b1fae", "#2a0a66"] },
     files: {
       rawVocals: "RAW VOCALS ONLY.wav",
       mixedVocals: "MIXED VOCALS.wav",
@@ -880,7 +880,7 @@ const genreConfigs = [
     slug: "alternative",
     assetFolder: "ALTERNATIVE",
     enabled: true,
-    theme: { type: "gradient", colors: ["#00ffd5", "#002bff"] },
+    theme: { type: "gradient", colors: ["#1a3d9f", "#06143f"] },
     files: {
       rawVocals: "RAW VOCALS.wav",
       mixedVocals: "MIXED VOCALS ONLY.wav",
@@ -906,8 +906,7 @@ const genreConfigs = [
 ];
 
 const activeGenres = genreConfigs.filter(g => g.enabled);
-let currentGenreIndex = Math.max(0, activeGenres.findIndex(g => g.slug === "rnb"));
-if (currentGenreIndex < 0) currentGenreIndex = 0;
+let currentGenreIndex = 0;
 
 function pathJoin(...parts) {
   return parts.join("/").replace(/\/{2,}/g, "/");
@@ -3398,28 +3397,34 @@ setTimeout(() => {
     outColor.g = baseColor.g;
     outColor.b = baseColor.b;
 
-    // Independent dual layers (no cross blend): each slider keeps its own tone.
-    const aWeight = 0.14 + 0.86 * rawMix;
-    const bWeight = 0.14 + 0.86 * vocalBeat;
+    // True 2-color gradient per genre.
+    const gradientT = clamp01(energy * 0.78 + vocalBeat * 0.22);
+    const gradR = themePair.a.r + (themePair.b.r - themePair.a.r) * gradientT;
+    const gradG = themePair.a.g + (themePair.b.g - themePair.a.g) * gradientT;
+    const gradB = themePair.a.b + (themePair.b.b - themePair.a.b) * gradientT;
 
-    const coexistR = clamp01(themePair.a.r * aWeight + themePair.b.r * bWeight);
-    const coexistG = clamp01(themePair.a.g * aWeight + themePair.b.g * bWeight);
-    const coexistB = clamp01(themePair.a.b * aWeight + themePair.b.b * bWeight);
-
+    // Peak intensity when BOTH sliders are fully right.
     const activity = Math.max(rawMix, vocalBeat);
-    const amt = clamp01(0.36 + activity * 0.52);
+    const peakDrive = rawMix * vocalBeat;
+    const amt = clamp01(0.28 + activity * 0.34 + peakDrive * 0.38);
 
-    outColor.r = outColor.r * (1 - amt) + coexistR * amt;
-    outColor.g = outColor.g * (1 - amt) + coexistG * amt;
-    outColor.b = outColor.b * (1 - amt) + coexistB * amt;
+    outColor.r = outColor.r * (1 - amt) + gradR * amt;
+    outColor.g = outColor.g * (1 - amt) + gradG * amt;
+    outColor.b = outColor.b * (1 - amt) + gradB * amt;
 
-    const chromaBoost = 1.12 + energy * 0.30;
+    const chromaBoost = 1.08 + activity * 0.16 + peakDrive * 0.55;
     const maxCh = Math.max(outColor.r, outColor.g, outColor.b);
     const minCh = Math.min(outColor.r, outColor.g, outColor.b);
     const mid = (maxCh + minCh) * 0.5;
     outColor.r = clamp01((outColor.r - mid) * chromaBoost + mid);
     outColor.g = clamp01((outColor.g - mid) * chromaBoost + mid);
     outColor.b = clamp01((outColor.b - mid) * chromaBoost + mid);
+
+    // Small brightness lift that also peaks when both sliders are maxed.
+    const peakLift = peakDrive * 0.16;
+    outColor.r = clamp01(outColor.r + peakLift);
+    outColor.g = clamp01(outColor.g + peakLift);
+    outColor.b = clamp01(outColor.b + peakLift);
     return outColor;
   }
 
