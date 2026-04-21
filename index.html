@@ -553,9 +553,9 @@
       grid-template-columns: minmax(132px, 1fr) auto minmax(132px, 1fr);
       align-items: center;
       column-gap: 18px;
-      padding-top: 0px; /* Minimal spacing from rows above */
-      padding-bottom: 0;
-      margin-top: -2px;
+      padding-top: 6px;
+      padding-bottom: 8px;
+      margin-top: 0;
       margin-left: 0;
       margin-right: 0;
       margin-bottom: 0;
@@ -563,6 +563,7 @@
       z-index: 2;
       flex-shrink: 0; /* Never shrink */
       width: 100%; /* Ensure full width for centering */
+      min-height: calc(var(--btnH) + 8px);
     }
 
     .controlsSpacer {
@@ -591,11 +592,15 @@
       transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
       font-family: inherit;
       margin: 0;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
       justify-self: center;
     }
 
     .btn:active {
-      transform: scale(1.03);
+      transform: translate(-50%, -50%) scale(1.03);
       background: rgba(255,255,255,0.12);
       border-color: rgba(255,255,255,0.28);
     }
@@ -772,14 +777,15 @@
       }
       
       .controls {
-        padding-top: 0px; /* Minimal spacing on mobile */
-        padding-bottom: 0;
-        margin-top: -10px !important; /* Negative margin to pull button up further */
+        padding-top: 6px;
+        padding-bottom: 8px;
+        margin-top: 0 !important;
         margin-bottom: 0;
         flex-shrink: 0;
         flex-grow: 0;
         grid-template-columns: minmax(0, 1fr) auto auto;
         column-gap: 10px;
+        min-height: calc(var(--btnH) + 6px);
       }
 
       .controlsSpacer {
