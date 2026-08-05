@@ -609,6 +609,93 @@
       white-space: nowrap;
     }
 
+    .volumeControl {
+      position: absolute;
+      left: calc(25% - (var(--btnW) / 4) - 24px);
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: block;
+      height: 30px;
+      min-width: 0;
+      z-index: 3;
+      white-space: nowrap;
+    }
+
+    .volumeLabel {
+      position: absolute;
+      top: calc(100% + 5px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(11px, 1.3vw, 13px);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.92);
+      line-height: 1;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .volumePill {
+      width: 62px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 14px rgba(0,0,0,0.32);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+      box-sizing: border-box;
+    }
+
+    .volumeSlider {
+      width: 100%;
+      height: 4px;
+      appearance: none;
+      -webkit-appearance: none;
+      background: rgba(255,255,255,0.28);
+      border-radius: 999px;
+      outline: none;
+      touch-action: pan-y;
+    }
+
+    .volumeSlider::-webkit-slider-runnable-track {
+      height: 4px;
+      background: rgba(255,255,255,0.28);
+      border-radius: 999px;
+    }
+
+    .volumeSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      margin-top: -5px;
+      border-radius: 50%;
+      border: 0;
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.34);
+      cursor: pointer;
+    }
+
+    .volumeSlider::-moz-range-track {
+      height: 4px;
+      background: rgba(255,255,255,0.28);
+      border-radius: 999px;
+      border: 0;
+    }
+
+    .volumeSlider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 0;
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.34);
+      cursor: pointer;
+    }
+
     .beatLabel {
       position: absolute;
       top: calc(100% + 5px);
@@ -794,7 +881,18 @@
         height: 28px;
       }
 
+      .volumeControl {
+        left: calc(25% - (var(--btnW) / 4) - 18px);
+        transform: translate(-50%, -50%);
+        height: 28px;
+      }
+
       .beatLabel {
+        font-size: clamp(10px, 2.4vw, 12px);
+        letter-spacing: 0.14em;
+      }
+
+      .volumeLabel {
         font-size: clamp(10px, 2.4vw, 12px);
         letter-spacing: 0.14em;
       }
@@ -802,6 +900,12 @@
       .beatToggle {
         width: 50px;
         height: 28px;
+      }
+
+      .volumePill {
+        width: 58px;
+        height: 28px;
+        padding: 0 7px;
       }
 
       .beatToggle .beatToggleKnob {
@@ -887,6 +991,12 @@
 
           <div class="controls">
             <button class="btn" id="btnPlay">PLAY</button>
+            <div class="volumeControl">
+              <div class="volumePill">
+                <input class="volumeSlider" id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume" />
+              </div>
+              <span class="volumeLabel">VOL</span>
+            </div>
             <div class="beatControl">
               <button class="beatToggle is-on" id="beatToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle beat">
                 <span class="beatToggleKnob"></span>
@@ -1052,6 +1162,42 @@ async function initAudio() {
 let visualizerHasData = false;
 let userHasInteracted = false;
 let loadingIndicatorTimeoutId = null;
+let iosPlaybackUnlocked = false;
+let iosUnlockAudioEl = null;
+
+function createSilentWavDataUri() {
+  // Tiny silent PCM WAV payload for iOS playback category unlock.
+  return "data:audio/wav;base64,UklGRlQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+}
+
+async function ensureIOSPlaybackModeFromGesture() {
+  // Best path on newer Safari builds.
+  try {
+    if (navigator.audioSession && navigator.audioSession.type !== "playback") {
+      navigator.audioSession.type = "playback";
+      iosPlaybackUnlocked = true;
+    }
+  } catch (_) {}
+
+  if (iosPlaybackUnlocked) return;
+
+  // Fallback path: pulse a tiny inline audio element from a user gesture.
+  try {
+    if (!iosUnlockAudioEl) {
+      iosUnlockAudioEl = document.createElement("audio");
+      iosUnlockAudioEl.setAttribute("playsinline", "");
+      iosUnlockAudioEl.preload = "auto";
+      iosUnlockAudioEl.src = createSilentWavDataUri();
+      iosUnlockAudioEl.volume = 0.001;
+    }
+    await iosUnlockAudioEl.play();
+    iosUnlockAudioEl.pause();
+    iosUnlockAudioEl.currentTime = 0;
+    iosPlaybackUnlocked = true;
+  } catch (_) {
+    // Keep silent; we retry on next user gesture.
+  }
+}
 
 function showLoadingIndicator() {
   const indicator = document.getElementById('loadingIndicator');
@@ -1245,6 +1391,7 @@ function buildGraph() {
   audio.dataArray = new Uint8Array(bufferLength);
   
   // Connect analyser to master gain, then to destination
+  audio.masterGain.gain.value = volumeLevel;
   audio.masterGain.connect(audio.analyser);
   audio.analyser.connect(audio.ctx.destination);
   
@@ -2877,10 +3024,18 @@ const btnPlay = document.getElementById("btnPlay");
 
 let tone = 0;
 let beatOn = true;
+let volumeLevel = 1;
 
 function applyMix(){
   if (!audio.ctx) return;
   setMix(tone, beatOn);
+}
+
+function applyMasterVolume() {
+  if (!audio.masterGain || !audio.ctx) return;
+  const now = audio.ctx.currentTime;
+  audio.masterGain.gain.cancelScheduledValues(now);
+  audio.masterGain.gain.setTargetAtTime(volumeLevel, now, 0.02);
 }
 
 let firstGestureDone = false;
@@ -2889,6 +3044,7 @@ async function onFirstInteract(){
   if (firstGestureDone) return;
   firstGestureDone = true;
   userHasInteracted = true;
+  await ensureIOSPlaybackModeFromGesture();
   visualizerHasData = false;
   if (!visualizerHasData) {
     showLoadingIndicator();
@@ -2908,6 +3064,7 @@ btnPlay.addEventListener("click", async (e) => {
   e.preventDefault();
   userHasInteracted = true;
   try{
+    await ensureIOSPlaybackModeFromGesture();
     // iOS: click is a safe gesture; force resume
     await initAudio();
     await audio.ctx.resume();
@@ -2945,6 +3102,7 @@ window.addEventListener("keydown", async (e) => {
   e.preventDefault();
   userHasInteracted = true;
   try{
+    await ensureIOSPlaybackModeFromGesture();
     await initAudio();
     await audio.ctx.resume();
     if (!audio.started) {
@@ -3088,6 +3246,7 @@ const sliderTone = makeSlider({
 });
 
 const beatToggleBtn = document.getElementById("beatToggle");
+const volumeSliderInput = document.getElementById("volumeSlider");
 
 function updateBeatToggleUI() {
   if (!beatToggleBtn) return;
@@ -3111,6 +3270,21 @@ function setBeatState(nextValue, fromUser = false) {
 if (beatToggleBtn) {
   beatToggleBtn.addEventListener("click", () => {
     setBeatState(!beatOn, true);
+  }, { passive: true });
+}
+
+if (volumeSliderInput) {
+  const initialVolume = parseFloat(volumeSliderInput.value);
+  if (Number.isFinite(initialVolume)) {
+    volumeLevel = Math.max(0, Math.min(1, initialVolume));
+  }
+  volumeSliderInput.addEventListener("input", () => {
+    const next = parseFloat(volumeSliderInput.value);
+    if (!Number.isFinite(next)) return;
+    volumeLevel = Math.max(0, Math.min(1, next));
+    userHasInteracted = true;
+    onFirstInteract();
+    applyMasterVolume();
   }, { passive: true });
 }
 
@@ -4076,6 +4250,9 @@ function isInteractiveElement(target) {
   // Genre selector rail/dots/title should remain interactive (no scroll overlay capture)
   if (target.closest('#genreWrap') || target.closest('#genreRail') || target.closest('.genreLabel')) return true;
   
+  // Volume pill control
+  if (target.closest('.volumeControl') || target.id === 'volumeSlider') return true;
+  
   // Check if it's a button
   if (target.closest('button') || target.tagName === 'BUTTON') return true;
   
@@ -4121,29 +4298,9 @@ document.addEventListener("touchstart", (e) => {
 document.addEventListener("touchmove", (e) => {
   const target = e.target;
   
-  // If user is interacting with slider/button, prevent scrolling
+  // If user is interacting with slider/button, never block vertical page scroll.
   if (isInteractiveElement(target)) {
     if (scrollOverlay) scrollOverlay.classList.remove('active');
-    
-    // Handle slider drag detection
-    if (panelEl && panelEl.contains(target)) {
-      const trackWrap = target.closest('.trackWrap');
-      if (trackWrap && e.touches.length > 0) {
-        const touch = e.touches[0];
-        const deltaY = Math.abs(touch.clientY - touchStartY);
-        const deltaX = Math.abs(touch.clientX - touchStartX);
-        
-        // If horizontal movement is greater than vertical, it's a slider drag
-        if (deltaX > 10 && deltaX > deltaY * 1.5) {
-          isDraggingSlider = true;
-          e.preventDefault(); // Prevent scroll during horizontal slider drag
-        } else if (isDraggingSlider && deltaX > 5) {
-          // Continue preventing scroll while dragging horizontally
-          e.preventDefault();
-        }
-        // For vertical movement or no clear direction, allow parent scroll (don't preventDefault)
-      }
-    }
     return;
   }
   
@@ -4157,15 +4314,7 @@ document.addEventListener("touchmove", (e) => {
     return;
   }
   
-  // Other non-interactive areas: only prevent horizontal so iframe never scrolls sideways
-  if (e.touches.length > 0 && touchStartY !== 0 && touchStartX !== 0) {
-    const touch = e.touches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartX);
-    const deltaY = Math.abs(touch.clientY - touchStartY);
-    if (deltaX > 15 && deltaX > deltaY * 1.5) {
-      e.preventDefault();
-    }
-  }
+  // Never preventDefault here; parent page scroll should always win.
 }, { passive: false });
 
 document.addEventListener("touchend", (e) => {
