@@ -6,388 +6,38 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Quad808 — Quad Interactive Mix Fader</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <style>
-    @font-face {
-      font-family: "VCR OSD Mono";
-      src: url("assets/fonts/VCR_OSD_MONO_1.001.ttf") format("truetype");
-      font-weight: normal;
-      font-style: normal;
-      font-display: swap;
-    }
+    @import url("https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap");
+  </style>
 
+  <style>
     html, body {
       height: 100%;
       margin: 0;
       padding: 0;
-      background: #000;
-      overflow-x: hidden; /* kill sideways drag */
+      background: transparent;
+      overscroll-behavior: none;
     }
 
     body {
       -webkit-text-size-adjust: 100%;
-      font-family: "VCR OSD Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
-      touch-action: pan-y pinch-zoom;
-      overflow: hidden; /* the app itself should not scroll on desktop */
-    }
-    
-    /* Wrapper to clamp horizontal overflow and prevent horizontal scroll */
-    .iframe-wrapper {
-      width: 100%;
-      background: #000;
-      overflow-x: hidden;
-      overscroll-behavior-x: none;
-      position: relative;
-    }
-    
-    /* Transparent overlay to intercept scroll gestures when needed */
-    .scroll-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      pointer-events: none; /* Default: allow iframe interactions */
-      z-index: 10000;
-      background: transparent;
-      touch-action: pan-y; /* Allow vertical scrolling when active */
-    }
-    
-    .scroll-overlay.active {
-      pointer-events: auto; /* Intercept touches for parent page scrolling */
-      touch-action: pan-y; /* Explicitly allow vertical panning */
+      touch-action: none;
     }
 
-    /* New app layout structure */
-    .app {
-      height: 100dvh; /* correct on iOS + desktop */
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
-      box-sizing: border-box;
-    }
-
-    .vizWrap {
-      flex: 1 1 auto;
-      min-height: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      position: relative;
-      touch-action: pan-y;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-
-    .vizWrap canvas,
-    .vizWrap .threeCanvas,
-    .vizWrap .renderer,
-    .vizWrap .stageCanvas,
-    .vizWrap canvas[data-engine] {
-      width: 100% !important;
-      height: 100% !important;
-      display: block;
-    }
-
-    .controlsWrap {
-      flex: 0 0 auto; /* NEVER stretch */
-      height: auto !important;
-      min-height: 0 !important;
-      display: flex;
-      justify-content: center;
-      padding: 12px 16px 16px;
-      box-sizing: border-box;
-    }
-
-    .genreWrap {
-      --genre-dot-size: 10px;
-      --genre-end-inset: 20px;
-      flex: 0 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 0 20px 12px;
-      box-sizing: border-box;
-      touch-action: pan-y;
-    }
-
-    .genreTitle {
-      font-size: clamp(20px, 3vw, 34px);
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.96);
-      text-shadow: 0 0 18px rgba(255,255,255,0.2);
-      user-select: none;
-      -webkit-user-select: none;
-      line-height: 1;
-      min-height: 1em;
-      transition: color 360ms ease, text-shadow 420ms ease, opacity 320ms ease, transform 320ms ease;
-      will-change: opacity, text-shadow, transform;
-    }
-
-    .genreRail {
-      width: min(690px, 72vw);
-      height: 42px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.9);
-      background: #000;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      position: relative;
-      overflow: visible;
-      touch-action: pan-x;
-      user-select: none;
-      -webkit-user-select: none;
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.06),
-        0 4px 14px rgba(0,0,0,0.28);
-      transition: box-shadow 260ms ease, border-color 260ms ease, background 260ms ease;
-    }
-
-    .genreRail::before {
-      content: "";
-      position: absolute;
-      inset: 3px;
-      border-radius: 999px;
-      background: linear-gradient(115deg, rgba(255,255,255,0.0) 20%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.0) 80%);
-      opacity: 0.14;
-      filter: blur(0.4px);
-      transform: translateX(-18%);
-      animation: genreRailSheen 8s ease-in-out infinite;
-      pointer-events: none;
-    }
-
-    .genreRail::after {
-      content: "";
-      position: absolute;
-      left: 8px;
-      right: 8px;
-      top: 6px;
-      height: 10px;
-      border-radius: 999px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0));
-      opacity: 0.2;
-      pointer-events: none;
-    }
-
-    .genreKnob {
-      position: absolute;
-      top: 50%;
-      width: var(--knob);
-      height: var(--knob);
-      border-radius: 50%;
-      background: #fff;
-      transform: translate(-50%, -50%);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-      transition: left 220ms cubic-bezier(.2,.9,.2,1), transform 220ms cubic-bezier(.2,.9,.2,1), box-shadow 220ms ease;
-      pointer-events: none;
-      z-index: 3;
-    }
-
-    .genreLabels {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 0 var(--genre-end-inset);
-      box-sizing: border-box;
-      user-select: none;
-      -webkit-user-select: none;
-      z-index: 2;
-    }
-
-    .genreLabel {
-      width: var(--genre-dot-size);
-      height: var(--genre-dot-size);
-      border-radius: 50%;
-      background: rgba(255,255,255,0.4);
-      border: 1px solid rgba(255,255,255,0.5);
-      cursor: pointer;
-      transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
-      box-shadow: 0 0 6px rgba(255,255,255,0.16);
-    }
-
-    .genreLabel.active {
-      background: #fff;
-      box-shadow: 0 0 10px rgba(255,255,255,0.52), 0 0 16px rgba(255,255,255,0.24);
-      transform: scale(1.18);
-    }
-
-    .genreWrap.genre-changing .genreTitle {
-      animation: genreTitleFlash 560ms cubic-bezier(.22,.75,.2,1);
-    }
-
-    .genreWrap.genre-changing .genreKnob {
-      transform: translate(-50%, -50%) scale(1.08);
-      box-shadow:
-        0 10px 24px rgba(0,0,0,0.34),
-        0 0 16px rgba(255,255,255,0.46),
-        inset 0 1px 1px rgba(255,255,255,0.9);
-    }
-
-    .genreWrap.genre-changing .genreRail {
-      border-color: rgba(255,255,255,0.24);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.18),
-        inset 0 -10px 22px rgba(0,0,0,0.24),
-        0 6px 18px rgba(0,0,0,0.3),
-        0 0 14px rgba(255,255,255,0.12);
-    }
-
-    @keyframes genreRailSheen {
-      0% { transform: translateX(-18%); opacity: 0.16; }
-      50% { transform: translateX(18%); opacity: 0.28; }
-      100% { transform: translateX(-18%); opacity: 0.16; }
-    }
-
-    @keyframes genreTitleFlash {
-      0% {
-        opacity: 0.82;
-        transform: translateY(0.5px);
-        text-shadow: 0 0 10px rgba(255,255,255,0.12);
-      }
-      42% {
-        opacity: 1;
-        transform: translateY(0);
-        text-shadow: 0 0 22px rgba(255,255,255,0.42), 0 0 34px rgba(255,255,255,0.16);
-      }
-      100% {
-        opacity: 0.98;
-        transform: translateY(0);
-        text-shadow: 0 0 16px rgba(255,255,255,0.2);
-      }
-    }
-
-    /* Legacy .stage class for backwards compatibility */
     .stage {
-      /* Deprecated - use .app instead */
-      display: none;
-    }
-
-    .profileBadge {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
+      min-height: 100%;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 0;
-      z-index: 10;
-      pointer-events: auto;
-      opacity: 0;
-      transition: opacity 200ms ease-in;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    
-    .profileBadge:hover {
-      opacity: 0.9;
-    }
-    
-    .profileBadge.visible {
-      opacity: 1;
-    }
-    
-    .profileAvatar {
-      width: clamp(72px, 9.75vw, 96px); /* 2/3 of original size */
-      height: clamp(72px, 9.75vw, 96px); /* 2/3 of original size */
-      border-radius: 50%;
-      background: rgba(255,255,255,0.1);
-      border: 2px solid rgba(255,255,255,0.15);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 16px rgba(255,255,255,0.1);
-      object-fit: cover;
-      display: block;
-    }
-    
-    .profileLabel {
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 999px;
-      padding: 2px 6px; /* 2/3 of original padding */
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      text-align: center;
-      color: rgba(255,255,255,0.9);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      white-space: nowrap;
-      margin-top: -10px; /* 2/3 of original margin */
-      position: relative;
-      z-index: 11;
-    }
-    
-    .profileLabelLine {
-      display: block;
-      line-height: 0.3;
-    }
-    
-    .profileLabelLine:first-child {
-      font-size: clamp(4.5px, 0.55vw, 5.5px); /* 2/3 of original size */
-      margin-bottom: -8px; /* Much tighter spacing */
-    }
-    
-    .profileLabelLine:last-child {
-      font-size: clamp(7px, 0.9vw, 9px); /* 2/3 of original size */
-    }
-
-    .viz {
-      display: none; /* Hide old 2D visualizer */
-    }
-    
-    #viz3d,
-    .viz3d {
-      width: min(1093px, 91vw);
-      max-width: 100%;
-      height: 500px;
+      justify-content: center;
+      padding: 24px 16px;
+      box-sizing: border-box;
       background: transparent;
-      border-radius: 22px;
-      margin: 0 auto 20px auto;
-      position: relative;
-      overflow: hidden;
-      box-shadow: none;
-      order: -1;
-      flex-shrink: 1;
-      touch-action: pan-y;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-    
-    #viz3d canvas,
-    .viz3d canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      background: transparent !important;
-      touch-action: pan-y;
-      -webkit-user-select: none;
-      user-select: none;
-      pointer-events: auto;
-    }
-    
-    /* Overlay on top of visualizer canvas so touches scroll the parent page */
-    .viz3d-scroll-pass {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      pointer-events: auto;
-      touch-action: pan-y;
-      -webkit-user-select: none;
-      user-select: none;
     }
 
     .panel {
@@ -396,26 +46,13 @@
       background: rgba(0,0,0,0.55);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
-      border: 1px solid rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.10);
       box-shadow: 0 18px 50px rgba(0,0,0,0.55);
-      padding: 14px 26px 14px; /* Very tight vertical padding */
+      padding: 26px 26px 22px;
       box-sizing: border-box;
       color: #fff;
       position: relative;
-      overflow: visible; /* Allow knobs to extend beyond panel bounds */
-      height: fit-content !important;
-      min-height: 0 !important;
-      max-height: none !important;
-      touch-action: pan-x pinch-zoom; /* Allow horizontal pan for sliders, prevent vertical scroll on panel */
-      overscroll-behavior: none; /* Prevent scroll chaining */
-      display: flex;
-      flex-direction: column; /* Enable flex layout for vertical centering */
-      z-index: 1; /* Lower z-index so knobs can appear above */
-    }
-
-    /* Ensure panel children don't force height */
-    .panel * {
-      min-height: 0;
+      overflow: visible; /* allow FX beyond bounds */
     }
 
     /* Panel-wide FX overlay so explosions never clip */
@@ -424,9 +61,35 @@
       inset: -40px;            /* extra room so particles can fly */
       pointer-events: none;
       z-index: 3;              /* above labels so nothing clips it */
-      overflow: visible;       /* Allow particles to extend beyond panel bounds */
     }
 
+    /* Reward flash wave overlay */
+    .rewardWave {
+      position: absolute;
+      inset: -10px;
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0;
+      mix-blend-mode: screen;
+    }
+    .rewardWave.run {
+      animation: waveFlash 520ms ease-out forwards;
+    }
+    @keyframes waveFlash {
+      0%   { opacity: 0; transform: translateX(18%); }
+      10%  { opacity: 1; }
+      100% { opacity: 0; transform: translateX(-22%); }
+    }
+    .rewardWave::before{
+      content:"";
+      position:absolute;
+      inset:-20px;
+      background:
+        radial-gradient(120px 120px at 88% 35%, rgba(255,255,255,0.95), rgba(255,255,255,0) 60%),
+        radial-gradient(180px 180px at 86% 62%, rgba(255,255,255,0.85), rgba(255,255,255,0) 70%),
+        linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 100%);
+      filter: blur(2px);
+    }
 
     :root{
       --text: clamp(16px, 2.2vw, 22px);
@@ -434,11 +97,9 @@
       --trackH: 4px;
       --knob: clamp(28px, 4.0vw, 38px);
       --knobPress: 1.40; /* expand 40% on press */
-      --rowGap: clamp(4px, 1vw, 8px); /* Very tight spacing between rows */
-      --labelGap: 1px; /* Minimal gap - labels will be very close to sliders */
-      /* Maximize hitbox: extend into gap between sliders, leaving ~1px buffer to prevent overlap */
-      /* Gap is rowGap * 1.2, so each slider can extend by ~(gap/2 - 1px) */
-      --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(7.4px, 1.32vw, 9.8px));
+      --rowGap: clamp(14px, 2.2vw, 18px);
+      --labelGap: 10px;
+      --hitH: clamp(56px, 9.5vw, 74px);
       --btnH: clamp(44px, 6vw, 54px);
       --btnW: clamp(120px, 18vw, 170px);
 
@@ -448,16 +109,9 @@
 
     .rows {
       display: grid;
-      gap: var(--rowGap); /* Use rowGap directly, no multiplier */
+      gap: calc(var(--rowGap) * 1.2);
       position: relative;
       z-index: 2;
-      flex: 0 0 auto; /* Don't grow, just fit content */
-      min-height: 0;
-      overflow: visible; /* Allow knobs to extend beyond row bounds */
-    }
-
-    .panel.single-slider .rows {
-      padding: 12px 0 16px;
     }
 
     .row {
@@ -476,14 +130,9 @@
       color: #fff;
       opacity: 0.98;
       padding: 0 2px;
-      margin-bottom: -6px; /* Pull labels down closer to sliders without affecting frame height */
       pointer-events: none;
       position: relative;
       z-index: 2;
-    }
-
-    .row[data-slider="tone"] .labels {
-      font-size: var(--text);
     }
 
     .trackWrap {
@@ -491,13 +140,12 @@
       height: var(--hitH);
       display: flex;
       align-items: center;
-      touch-action: pan-y; /* Allow vertical page scroll even over slider knobs */
+      touch-action: none;
       padding-left: var(--endPad);
       padding-right: var(--endPad);
       box-sizing: border-box;
-      overflow: visible; /* Allow knob to extend beyond track bounds */
+      overflow: visible;
       z-index: 2;
-      cursor: pointer; /* Ensure cursor indicates clickability */
     }
 
     .track {
@@ -507,7 +155,6 @@
       background: rgba(255,255,255,0.18);
       position: relative;
       overflow: visible;
-      pointer-events: none; /* Allow clicks to pass through to trackWrap */
     }
 
     .trackGlow {
@@ -532,10 +179,9 @@
       border-radius: 50%;
       background: #fff;
       box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-      will-change: transform, left, top, clip-path;
+      will-change: transform, left, top;
       touch-action: none;
-      z-index: 100; /* High z-index to appear above glass frame */
-      transition: clip-path 0.05s ease-out;
+      z-index: 5;
     }
 
     .knob.isDown {
@@ -549,27 +195,18 @@
     }
 
     .controls {
-      display: block;
-      padding-top: 6px;
-      padding-bottom: 10px;
-      margin-top: 0;
-      margin-left: 0;
-      margin-right: 0;
-      margin-bottom: 0;
+      display: flex;
+      justify-content: center;
+      padding-top: 18px;
       position: relative;
       z-index: 2;
-      flex-shrink: 0; /* Never shrink */
-      width: 100%; /* Ensure full width for centering */
-      min-height: calc(var(--btnH) + 56px);
-      padding-left: 12px;
-      padding-right: 12px;
     }
 
     .btn {
       height: var(--btnH);
       width: var(--btnW);
       border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.18);
       background: rgba(255,255,255,0.08);
       color: #fff;
       font-size: var(--text);
@@ -584,295 +221,91 @@
       -webkit-tap-highlight-color: transparent;
       transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
       font-family: inherit;
-      margin: 0;
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
     }
 
     .btn:active {
-      transform: translate(-50%, -50%) scale(1.03);
+      transform: scale(1.03);
       background: rgba(255,255,255,0.12);
       border-color: rgba(255,255,255,0.28);
     }
 
-    .beatControl {
+    /* Easter egg popup */
+    .coupon {
       position: absolute;
-      left: calc(75% + (var(--btnW) / 4) + 24px);
+      left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      display: block;
-      height: 30px;
-      min-width: 0;
-      z-index: 3;
-      white-space: nowrap;
+      z-index: 6;
+      background: rgba(0,0,0,0.72);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 16px;
+      padding: 16px 18px;
+      min-width: min(320px, 86vw);
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: 0 18px 48px rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
-
-    .beatLabel {
-      position: absolute;
-      top: calc(100% + 5px);
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: clamp(11px, 1.3vw, 13px);
+    .coupon.show {
+      opacity: 1;
+      pointer-events: auto;
+      animation: popIn 220ms ease-out;
+    }
+    @keyframes popIn {
+      from { transform: translate(-50%, -50%) scale(0.92); opacity: 0; }
+      to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+    .coupon .title {
+      font-size: clamp(16px, 2.4vw, 20px);
       letter-spacing: 0.18em;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.92);
-      line-height: 1;
-      user-select: none;
-      -webkit-user-select: none;
+      margin-bottom: 10px;
+    }
+    .coupon .code {
+      font-size: clamp(18px, 2.8vw, 24px);
+      letter-spacing: 0.22em;
+      font-weight: 700;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.10);
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+    .coupon .sub {
+      font-size: clamp(12px, 1.8vw, 14px);
+      opacity: 0.85;
+      letter-spacing: 0.06em;
     }
 
-    .beatToggle {
-      width: 54px;
-      height: 30px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.9);
-      background: rgba(255,255,255,0.08);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 14px rgba(0,0,0,0.32);
-      position: relative;
-      padding: 0;
-      cursor: pointer;
-      transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-    }
-
-    /* Optical endpoint framing for single remaining top slider */
-    .panel.single-slider .row[data-slider="tone"] .trackWrap {
-      padding-left: calc(var(--endPad) + 1px);
-      padding-right: calc(var(--endPad) + 3px);
-    }
-
-    .beatToggle .beatToggleKnob {
-      position: absolute;
-      top: 50%;
-      left: 3px;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      transform: translateY(-50%);
-      background: #fff;
-      box-shadow: 0 6px 14px rgba(0,0,0,0.35);
-      transition: left 170ms cubic-bezier(.2,.9,.2,1), box-shadow 170ms ease;
-      pointer-events: none;
-    }
-
-    .beatToggle.is-on {
-      border-color: rgba(255,255,255,0.9);
-      background: rgba(255,255,255,0.08);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 8px 18px rgba(0,0,0,0.34);
-    }
-
-    .beatToggle.is-on .beatToggleKnob {
-      left: calc(100% - 25px);
-    }
-
-    /* Loading indicator */
-    .loadingIndicator {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 10000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-    }
-
-    .loadingIndicator.visible {
-      display: flex;
-    }
-
-    .loadingSpinner {
-      width: 60px;
-      height: 60px;
-      border: 3px solid rgba(255, 255, 255, 0.2);
-      border-top-color: rgba(255, 255, 255, 0.8);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .loadingText {
-      color: #fff;
-      font-family: "VCR OSD Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: clamp(16px, 2.2vw, 22px);
-      letter-spacing: 0.1em;
-      text-transform: lowercase;
-      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-      animation: pulse 1.5s ease-in-out infinite;
-      text-align: center;
-      line-height: 1.4;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
-    }
-
-
-    @media (max-width: 767px){
-      html, body {
-        height: 100% !important;
-        overflow-x: hidden !important;
-        overflow-y: hidden !important;
+    @media (max-width: 520px){
+      .panel{
+        padding: 18px 16px 16px;
+        border-radius: 18px;
       }
-      
-      .app {
-        height: 100dvh !important;
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
-      }
-      
-      .vizWrap {
-        flex: 1 1 auto;
-        min-height: 0;
-        padding: 0 8px;
-      }
-      
-      .viz3d {
-        width: 100%;
-        max-width: 100%;
-        height: 100%;
-        margin: 0;
-        border-radius: 16px;
-      }
-      
-      .controlsWrap {
-        flex: 0 0 auto;
-        height: auto !important;
-        min-height: 0 !important;
-        padding: 12px 8px 12px;
-      }
-      
-      .panel {
-        width: calc(100% - 16px);
-        max-width: calc(100% - 16px);
-        margin: 0 auto;
-        padding: 10px 10px 10px; /* Very tight vertical padding */
-        border-radius: 16px;
-        height: fit-content !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        display: flex !important;
-        flex-direction: column !important;
-        overflow: visible !important; /* Allow knobs to extend beyond panel bounds */
-        overscroll-behavior: none !important; /* Prevent scroll chaining */
-      }
-      
-      .panel * {
-        min-height: 0;
-      }
-      
-      .rows {
-        flex: 0 0 auto;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 2px; /* Very tight gap on mobile */
-        overflow: visible;
-      }
-      
-      .controls {
-        padding-top: 6px;
-        padding-bottom: 8px;
-        margin-top: 0 !important;
-        margin-bottom: 0;
-        flex-shrink: 0;
-        flex-grow: 0;
-        min-height: calc(var(--btnH) + 50px);
-        padding-left: 8px;
-        padding-right: 8px;
-      }
-
-      .beatControl {
-        left: calc(75% + (var(--btnW) / 4) + 18px);
-        transform: translate(-50%, -50%);
-        height: 28px;
-      }
-
-      .beatLabel {
-        font-size: clamp(10px, 2.4vw, 12px);
-        letter-spacing: 0.14em;
-      }
-
-      .beatToggle {
-        width: 50px;
-        height: 28px;
-      }
-
-      .beatToggle .beatToggleKnob {
-        width: 20px;
-        height: 20px;
-      }
-
-      .beatToggle.is-on .beatToggleKnob {
-        left: calc(100% - 23px);
-      }
-    }
-    
-    /* Tighten spacing on short screens */
-    @media (max-height: 760px) {
-      .controlsWrap {
-        padding: 10px 14px 14px;
-      }
-      .panel {
-        padding-bottom: 14px;
-      }
-    }
-    
-    /* Optional: slightly shrink the 3D model area on very short screens so everything fits */
-    @media (max-height: 700px) {
-      .vizWrap {
-        padding-top: 6px;
-      }
-      
-      :root {
-        --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(30px, 5vw, 50px));
-        --rowGap: clamp(8px, 1.5vw, 12px);
-      }
-    }
-    
-    /* Additional mobile-specific hitbox increase for touch devices */
-    @media (hover: none) and (pointer: coarse) {
-      :root {
-        --hitH: calc(clamp(56px, 9.5vw, 74px) + clamp(40px, 6vw, 60px));
-      }
+      .controls{ padding-top: 14px; }
     }
   </style>
 </head>
 
 <body>
-  <div class="iframe-wrapper">
-    <div class="scroll-overlay" id="scrollOverlay"></div>
-    <div class="rewardWave" id="rewardWave"></div>
-    <div class="app">
-      <div class="vizWrap">
-        <div class="viz3d" id="viz3d">
-          <div class="loadingIndicator" id="loadingIndicator">
-            <div class="loadingSpinner"></div>
-          </div>
-        </div>
-      </div>
-      <div class="genreWrap" id="genreWrap">
-        <div class="genreTitle" id="genreTitle">MELODIC</div>
-        <div class="genreRail" id="genreRail">
-          <div class="genreKnob" id="genreKnob"></div>
-          <div class="genreLabels" id="genreLabels"></div>
-        </div>
-      </div>
-      <div class="controlsWrap">
-        <div class="panel single-slider" id="panel">
+  <div class="stage">
+    <div class="panel" id="panel">
       <canvas class="panelFx" id="panelFx"></canvas>
+      <div class="rewardWave" id="rewardWave"></div>
 
+      <div class="coupon" id="coupon">
+        <div class="title">Easter Egg Unlocked</div>
+        <div class="code" id="couponCode">QUAD50</div>
+        <div class="sub">50% off your first order</div>
+      </div>
 
       <div class="rows">
         <div class="row" data-slider="tone">
           <div class="labels">
-            <div>UNMIXED</div>
+            <div>RAW</div>
             <div>MIXED</div>
           </div>
 
@@ -883,159 +316,45 @@
             <div class="knob" id="knobTone" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"></div>
           </div>
         </div>
-      </div>
 
-          <div class="controls">
-            <button class="btn" id="btnPlay">PLAY</button>
-            <div class="beatControl">
-              <button class="beatToggle is-on" id="beatToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle beat">
-                <span class="beatToggleKnob"></span>
-              </button>
-              <span class="beatLabel">BEAT</span>
+        <div class="row" data-slider="blend">
+          <div class="labels">
+            <div>VOCALS</div>
+            <div>BEAT</div>
+          </div>
+
+          <div class="trackWrap" id="wrapBlend" aria-label="Vocals Beat Slider">
+            <div class="track">
+              <div class="trackGlow" id="glowBlend"></div>
             </div>
+            <div class="knob" id="knobBlend" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"></div>
           </div>
         </div>
       </div>
+
+      <div class="controls">
+        <button class="btn" id="btnPlay">PLAY</button>
+      </div>
     </div>
-    <canvas id="viz" class="viz"></canvas>
-  </div> <!-- End iframe-wrapper -->
+  </div>
 
 <script>
 /* =========================
    AUDIO
 ========================= */
 
-const genreConfigs = [
-  {
-    label: "Melodic",
-    slug: "melodic",
-    assetFolder: "MELODIC",
-    enabled: true,
-    theme: { type: "gradient", colors: ["#5b1fae", "#2a0a66"] },
-    files: {
-      rawVocals: "RAW VOCALS ONLY.wav",
-      mixedVocals: "MIXED VOCALS.wav",
-      rawVocalsWithBeat: "RAW VOCALS W BEAT.wav",
-      mixedVocalsWithBeat: "MIXED VOCALS W BEAT.wav",
-    },
-    notes: "",
-  },
-  {
-    label: "R&B",
-    slug: "rnb",
-    assetFolder: "__USE_CURRENT_WEBSITE_AUDIO__",
-    enabled: true,
-    theme: { type: "gradient", colors: ["#ff2d95", "#7a00ff"] },
-    files: {
-      rawVocals: "assets/audio/RAW_VOCALS.wav",
-      mixedVocals: "assets/audio/QUAD_VOCALS.wav",
-      rawVocalsWithBeat: "assets/audio/RAW_VOCALS_BEAT.wav",
-      mixedVocalsWithBeat: "assets/audio/QUAD_VOCALS_BEAT.wav",
-    },
-    notes: "Current website song",
-  },
-  {
-    label: "Trap",
-    slug: "trap",
-    assetFolder: "",
-    enabled: false,
-    theme: { type: "default", colors: [] },
-    files: { rawVocals: "", mixedVocals: "", rawVocalsWithBeat: "", mixedVocalsWithBeat: "" },
-    notes: "Disabled until assets are provided",
-  },
-  {
-    label: "Pop",
-    slug: "pop",
-    assetFolder: "POP",
-    enabled: true,
-    theme: { type: "gradient", colors: ["#ff5a00", "#ffe600"] },
-    files: {
-      rawVocals: "RAW VOCAL ONLY.wav",
-      mixedVocals: "MIXED VOCAL ONLY.wav",
-      rawVocalsWithBeat: "RAW VOCAL W BEAT.wav",
-      mixedVocalsWithBeat: "MIXED VOCAL W BEAT.wav",
-    },
-    notes: "",
-  },
-  {
-    label: "Bars",
-    slug: "bars",
-    assetFolder: "RAP",
-    enabled: true,
-    theme: { type: "gradient", colors: ["#7dff00", "#00ffd0"] },
-    files: {
-      rawVocals: "RAW VOCAL ONLY.wav",
-      mixedVocals: "MIXED VOCAL ONLY.wav",
-      rawVocalsWithBeat: "RAW VOCAL W BEAT.wav",
-      mixedVocalsWithBeat: "MIXED VOCAL W BEAT.wav",
-    },
-    notes: "Song title: Alone",
-  },
-  {
-    label: "Alternative",
-    slug: "alternative",
-    assetFolder: "ALTERNATIVE",
-    enabled: true,
-    theme: { type: "gradient", colors: ["#1a3d9f", "#06143f"] },
-    files: {
-      rawVocals: "RAW VOCALS.wav",
-      mixedVocals: "MIXED VOCALS ONLY.wav",
-      rawVocalsWithBeat: "RAW VOCALS W BEAT.wav",
-      mixedVocalsWithBeat: "MIXED VOCALS W BEAT.wav",
-    },
-    notes: "",
-  },
-  {
-    label: "Rock",
-    slug: "rock",
-    assetFolder: "ROCK",
-    enabled: true,
-    theme: { type: "gradient", colors: ["#ff1b1b", "#ff8a00"] },
-    files: {
-      rawVocals: "RAW VOCALS ONLY.wav",
-      mixedVocals: "MIXED VOCALS ONLY.wav",
-      rawVocalsWithBeat: "RAW VOCALS W BEAT.wav",
-      mixedVocalsWithBeat: "MIXED VOCALS W BEAT.wav",
-    },
-    notes: "",
-  },
-];
-
-const activeGenres = genreConfigs.filter(g => g.enabled);
-let currentGenreIndex = 0;
-
-function pathJoin(...parts) {
-  return parts.join("/").replace(/\/{2,}/g, "/");
-}
-
-function buildFilesForGenre(genre) {
-  if (genre.assetFolder === "__USE_CURRENT_WEBSITE_AUDIO__") {
-    return {
-      rawVocals: genre.files.rawVocals,
-      quadVocals: genre.files.mixedVocals,
-      rawFull: genre.files.rawVocalsWithBeat,
-      quadFull: genre.files.mixedVocalsWithBeat,
-    };
-  }
-  const base = pathJoin("QUAD VISUALIZER AUDIO FILES", genre.assetFolder);
-  return {
-    rawVocals: pathJoin(base, genre.files.rawVocals),
-    quadVocals: pathJoin(base, genre.files.mixedVocals),
-    rawFull: pathJoin(base, genre.files.rawVocalsWithBeat),
-    quadFull: pathJoin(base, genre.files.mixedVocalsWithBeat),
-  };
-}
-
-let FILES = buildFilesForGenre(activeGenres[currentGenreIndex]);
+const FILES = {
+  rawVocals: "assets/audio/RAW_VOCALS.wav",
+  quadVocals: "assets/audio/QUAD_VOCALS.wav",
+  rawFull: "assets/audio/RAW_VOCALS_BEAT.wav",
+  quadFull: "assets/audio/QUAD_VOCALS_BEAT.wav",
+};
 
 let audio = {
   ctx: null,
   buffers: {},
   sources: {},
   gains: {},
-  analyser: null,
-  masterGain: null,
-  dataArray: null,
   started: false,
   playing: false,
   loading: false,
@@ -1045,225 +364,30 @@ async function initAudio() {
   if (audio.ctx) return;
   const Ctx = window.AudioContext || window.webkitAudioContext;
   audio.ctx = new Ctx();
-  // iOS: Don't resume here - must be called from user gesture handler
-  // Resume will be called from gestureStartAudio() or play button
-}
-
-let visualizerHasData = false;
-let userHasInteracted = false;
-let loadingIndicatorTimeoutId = null;
-
-function showLoadingIndicator() {
-  const indicator = document.getElementById('loadingIndicator');
-  if (!indicator) return;
-  indicator.classList.add('visible');
-  if (loadingIndicatorTimeoutId) {
-    clearTimeout(loadingIndicatorTimeoutId);
-  }
-  // Failsafe: never let spinner stay forever.
-  loadingIndicatorTimeoutId = setTimeout(() => {
-    hideLoadingIndicator();
-  }, 8000);
-}
-
-function hideLoadingIndicator() {
-  const indicator = document.getElementById('loadingIndicator');
-  if (loadingIndicatorTimeoutId) {
-    clearTimeout(loadingIndicatorTimeoutId);
-    loadingIndicatorTimeoutId = null;
-  }
-  if (indicator) indicator.classList.remove('visible');
-}
-
-function checkVisualizerData() {
-  // Check if visualizer has actual audio data (not just zeros)
-  if (!audio.analyser || !audio.dataArray || !audio.ctx || audio.ctx.state !== 'running' || !audio.playing) {
-    return false;
-  }
-  
-  // Get current frequency data
-  audio.analyser.getByteFrequencyData(audio.dataArray);
-  
-  // Check if there's any non-zero data
-  // Use a low threshold so quieter intros still clear loading state.
-  for (let i = 0; i < Math.min(256, audio.dataArray.length); i++) {
-    if (audio.dataArray[i] > 1) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// Preload audio files (fetch bytes early), then decode/cache per genre on demand.
-const audioPreloadPromises = new Map();
-const decodedGenreBuffers = new Map();
-const decodeGenrePromises = new Map();
-const AUDIO_DECODE_TIMEOUT_MS = 45000;
-let sequentialGenreBuildStarted = false;
-
-function preloadAudioFiles(genre = activeGenres[currentGenreIndex]) {
-  if (!genre) return Promise.resolve([]);
-  if (audioPreloadPromises.has(genre.slug)) return audioPreloadPromises.get(genre.slug);
-  const files = buildFilesForGenre(genre);
-  const p = Promise.all(
-    Object.entries(files).map(async ([key, filename]) => {
-      const res = await fetchAudioFileFlexible(filename);
-      // Keep raw bytes so decode can be retried safely.
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      return { key, bytes };
-    })
-  ).catch((err) => {
-    // Allow retry if a preload fails once (network hiccup / stale path)
-    audioPreloadPromises.delete(genre.slug);
-    throw err;
-  });
-  audioPreloadPromises.set(genre.slug, p);
-  return p;
-}
-
-async function fetchAudioFileFlexible(filename) {
-  const candidates = [];
-  const pushUnique = (value) => {
-    if (value && !candidates.includes(value)) candidates.push(value);
-  };
-  pushUnique(filename);
-  try { pushUnique(encodeURI(filename)); } catch (_) {}
-  try { pushUnique(decodeURI(filename)); } catch (_) {}
-
-  let lastErr = null;
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) return res;
-      lastErr = new Error(`HTTP ${res.status} for ${url}`);
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr || new Error(`Missing file: ${filename}`);
-}
-
-async function decodeGenreBuffers(genre = activeGenres[currentGenreIndex]) {
-  if (!genre) return {};
-  if (!audio.ctx) {
-    throw new Error("Audio context not initialized");
-  }
-  if (decodedGenreBuffers.has(genre.slug)) {
-    return decodedGenreBuffers.get(genre.slug);
-  }
-  if (decodeGenrePromises.has(genre.slug)) {
-    return decodeGenrePromises.get(genre.slug);
-  }
-
-  const withTimeout = (promise, ms, label) => {
-    let timeoutId = null;
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
-    });
-    return Promise.race([promise, timeoutPromise]).finally(() => {
-      if (timeoutId) clearTimeout(timeoutId);
-    });
-  };
-
-  const p = (async () => {
-    const preloadedData = await preloadAudioFiles(genre);
-    const decoded = {};
-    // Decode sequentially for better reliability on mobile Safari.
-    for (const { key, bytes } of preloadedData) {
-      const decodeBuffer = bytes.slice().buffer;
-      decoded[key] = await withTimeout(
-        audio.ctx.decodeAudioData(decodeBuffer),
-        AUDIO_DECODE_TIMEOUT_MS,
-        `${genre.label} ${key} decode`
-      );
-    }
-    decodedGenreBuffers.set(genre.slug, decoded);
-    return decoded;
-  })().finally(() => {
-    decodeGenrePromises.delete(genre.slug);
-  });
-
-  decodeGenrePromises.set(genre.slug, p);
-  return p;
-}
-
-function preloadAllGenres() {
-  activeGenres.forEach((genre) => {
-    preloadAudioFiles(genre).catch((err) => {
-      console.warn(`Preload failed for ${genre.label}:`, err);
-    });
-  });
-}
-
-async function buildGenresOneByOne() {
-  if (sequentialGenreBuildStarted) return;
-  if (!audio.ctx) return;
-  sequentialGenreBuildStarted = true;
-  for (const genre of activeGenres) {
-    try {
-      await decodeGenreBuffers(genre);
-    } catch (err) {
-      console.warn(`Sequential build failed for ${genre.label}:`, err);
-    }
-  }
+  // iOS: resume must happen on a user gesture; we call resume from pointer handlers too.
+  await audio.ctx.resume();
 }
 
 async function loadBuffers() {
   if (audio.loading || Object.keys(audio.buffers).length) return;
   audio.loading = true;
-  if (userHasInteracted) {
-    showLoadingIndicator();
+  for (const [key, filename] of Object.entries(FILES)) {
+    const res = await fetch(filename, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Missing file: ${filename}`);
+    const arr = await res.arrayBuffer();
+    audio.buffers[key] = await audio.ctx.decodeAudioData(arr);
   }
-  try {
-    const activeGenre = activeGenres[currentGenreIndex];
-    const decoded = await decodeGenreBuffers(activeGenre);
-    audio.buffers = { ...decoded };
-  } catch (err) {
-    hideLoadingIndicator();
-    throw err;
-  } finally {
-    audio.loading = false;
-    // Don't hide loading here - wait for visualizer to have data
-  }
+  audio.loading = false;
 }
 
 function buildGraph() {
-  // iOS: sources must be started from user gesture, so we start them immediately
-  // when this is called (which should be from ensureStarted after resume)
-  
-  // Don't rebuild if already built
-  if (audio.sources.rawVocals && audio.masterGain) {
-    return;
-  }
-  
-  // Create master gain and analyser to analyze final output
-  audio.masterGain = audio.ctx.createGain();
-  audio.analyser = audio.ctx.createAnalyser();
-  audio.analyser.fftSize = 4096; // High resolution like Insight 2 (4096 FFT size)
-  audio.analyser.smoothingTimeConstant = 0.1; // Less smoothing for more detail/granularity
-  const bufferLength = audio.analyser.frequencyBinCount;
-  audio.dataArray = new Uint8Array(bufferLength);
-  
-  // Connect analyser to master gain, then to destination
-  audio.masterGain.connect(audio.analyser);
-  audio.analyser.connect(audio.ctx.destination);
-  
   const make = (name, bufKey) => {
     const src = audio.ctx.createBufferSource();
-    const buffer = audio.buffers[bufKey];
-    
-    if (!buffer || buffer.length === 0) {
-      throw new Error(`Invalid buffer for ${name}`);
-    }
-    
-    src.buffer = buffer;
+    src.buffer = audio.buffers[bufKey];
     src.loop = true;
-    src.loopStart = 0;
-    src.loopEnd = buffer.duration;
-    
     const gain = audio.ctx.createGain();
     gain.gain.value = 0;
-    src.connect(gain).connect(audio.masterGain);
+    src.connect(gain).connect(audio.ctx.destination);
     audio.sources[name] = src;
     audio.gains[name] = gain;
   };
@@ -1273,22 +397,16 @@ function buildGraph() {
   make("rawFull", "rawFull");
   make("quadFull", "quadFull");
 
-  // Start all sources immediately - no delay needed
-  const t0 = audio.ctx.currentTime + 0.01;
-  
-  // Start all sources synchronously
-  const sources = Object.values(audio.sources);
-  for (let i = 0; i < sources.length; i++) {
-    try {
-      sources[i].start(t0);
-    } catch (err) {
-      console.warn("Failed to start audio source:", err);
-    }
-  }
+  const t0 = audio.ctx.currentTime + 0.02;
+  Object.values(audio.sources).forEach(s => s.start(t0));
 }
 
-function setMix(tone, beatOn) {
+function setMix(tone, blend) {
   tone = Math.min(1, Math.max(0, tone));
+  blend = Math.min(1, Math.max(0, blend));
+
+  const vocalsLayer = (1 - blend);
+  const fullLayer = blend;
   const rawPart = (1 - tone);
   const quadPart = tone;
 
@@ -1302,44 +420,19 @@ function setMix(tone, beatOn) {
 
   if (!audio.gains.rawVocals) return;
 
-  // One continuous mix slider + one binary beat toggle.
-  if (beatOn) {
-    setGain(audio.gains.rawVocals, 0);
-    setGain(audio.gains.quadVocals, 0);
-    setGain(audio.gains.rawFull, rawPart);
-    setGain(audio.gains.quadFull, quadPart);
-  } else {
-    setGain(audio.gains.rawVocals, rawPart);
-    setGain(audio.gains.quadVocals, quadPart);
-    setGain(audio.gains.rawFull, 0);
-    setGain(audio.gains.quadFull, 0);
-  }
+  setGain(audio.gains.rawVocals, vocalsLayer * rawPart);
+  setGain(audio.gains.quadVocals, vocalsLayer * quadPart);
+  setGain(audio.gains.rawFull, fullLayer   * rawPart);
+  setGain(audio.gains.quadFull, fullLayer  * quadPart);
 }
 
 async function ensureStarted() {
   if (audio.started) return;
   await initAudio();
-  // iOS: Must resume context before starting sources (must be in user gesture)
-  if (audio.ctx.state !== 'running') {
-    try {
-      await audio.ctx.resume();
-    } catch (err) {
-      console.warn("Audio context resume failed:", err);
-      throw err; // Re-throw so caller knows it failed
-    }
-  }
-  
-  // Load buffers and build graph in parallel where possible
   await loadBuffers();
-  buildGraph(); // Don't await - it's synchronous except for a small delay
+  buildGraph();
   audio.started = true;
   audio.playing = true;
-  updatePlayButton();
-
-  // Build every genre one-by-one in background for reliable live switching.
-  setTimeout(() => {
-    buildGenresOneByOne().catch(() => {});
-  }, 0);
 }
 
 async function play() {
@@ -1353,118 +446,12 @@ async function pause() {
   if (!audio.ctx) return;
   await audio.ctx.suspend();
   audio.playing = false;
-  hideLoadingIndicator();
   updatePlayButton();
 }
 
 function updatePlayButton() {
   const btn = document.getElementById("btnPlay");
-  if (!btn) return;
-  
-  // Sync playing state with context state, but only if context exists and audio has started
-  // This ensures button reflects actual state when context is resumed via gestures
-  if (audio.ctx && audio.started) {
-    const contextRunning = audio.ctx.state === 'running';
-    // Only sync if context is running (don't override explicit pause)
-    // This handles the case where gestureStartAudio resumes the context
-    if (contextRunning) {
-      audio.playing = true;
-    }
-    // If context is suspended, trust our internal state (pause() sets it correctly)
-  }
-  
   btn.textContent = audio.playing ? "PAUSE" : "PLAY";
-}
-
-function stopAndResetAudioGraph() {
-  Object.values(audio.sources).forEach(src => {
-    try { src.stop(0); } catch (_) {}
-    try { src.disconnect(); } catch (_) {}
-  });
-  Object.values(audio.gains).forEach(g => {
-    try { g.disconnect(); } catch (_) {}
-  });
-  if (audio.analyser) {
-    try { audio.analyser.disconnect(); } catch (_) {}
-  }
-  if (audio.masterGain) {
-    try { audio.masterGain.disconnect(); } catch (_) {}
-  }
-  audio.buffers = {};
-  audio.sources = {};
-  audio.gains = {};
-  audio.analyser = null;
-  audio.masterGain = null;
-  audio.dataArray = null;
-  audio.started = false;
-  audio.playing = false;
-}
-
-async function switchGenre(nextIndex) {
-  const safeIndex = Math.max(0, Math.min(activeGenres.length - 1, nextIndex));
-  if (safeIndex === currentGenreIndex) return;
-  const prevIndex = currentGenreIndex;
-  const nextGenre = activeGenres[safeIndex];
-  const prevGenre = activeGenres[prevIndex];
-  const prevFiles = FILES;
-  preloadAudioFiles(nextGenre).catch(() => {});
-  const wasPlaying = audio.playing && audio.ctx && audio.ctx.state === "running";
-  let didResetGraph = false;
-  try {
-    visualizerHasData = false;
-    if (userHasInteracted) showLoadingIndicator();
-    // Make sure next genre is actually decodable before we tear down current playback.
-    if (audio.ctx) {
-      await decodeGenreBuffers(nextGenre);
-    }
-    currentGenreIndex = safeIndex;
-    FILES = buildFilesForGenre(nextGenre);
-    stopAndResetAudioGraph();
-    didResetGraph = true;
-    if (wasPlaying) {
-      await play();
-      applyMix();
-    } else {
-      updatePlayButton();
-    }
-  } catch (err) {
-    console.warn("Genre switch failed, reverting:", err);
-    currentGenreIndex = prevIndex;
-    FILES = prevFiles || buildFilesForGenre(prevGenre);
-    if (didResetGraph) {
-      stopAndResetAudioGraph();
-    }
-    hideLoadingIndicator();
-    updatePlayButton();
-  }
-}
-
-let genreSwitchInFlight = false;
-let queuedGenreIndex = null;
-
-async function requestGenreChange(nextIndex) {
-  const safeIndex = Math.max(0, Math.min(activeGenres.length - 1, nextIndex));
-  if (safeIndex === currentGenreIndex && !genreSwitchInFlight) return;
-  if (genreSwitchInFlight) {
-    queuedGenreIndex = safeIndex;
-    return;
-  }
-
-  genreSwitchInFlight = true;
-  try {
-    await switchGenre(safeIndex);
-  } catch (err) {
-    console.warn("Genre change request failed:", err);
-  } finally {
-    genreSwitchInFlight = false;
-    if (queuedGenreIndex !== null && queuedGenreIndex !== currentGenreIndex) {
-      const pending = queuedGenreIndex;
-      queuedGenreIndex = null;
-      await requestGenreChange(pending);
-    } else {
-      queuedGenreIndex = null;
-    }
-  }
 }
 
 /* =========================
@@ -1478,31 +465,7 @@ function makePanelFx(canvas, panelEl) {
     burst: null,       // {parts:[]}
     rainbow: null,     // {t, dir, strength, y}
     wave: null,        // {t, x0, y0}
-    completion: null,  // {iris: {t}, shards: {t, parts:[]}, particles: {t, parts:[]}}
   };
-
-  // Reusable particle pools to avoid allocations
-  const particlePool = [];
-  const shardPool = [];
-  
-  function getParticle() {
-    return particlePool.pop() || { x: 0, y: 0, vx: 0, vy: 0, life: 1, size: 0, angle: 0, type: 0 };
-  }
-  
-  function getShard() {
-    return shardPool.pop() || { angle: 0, hue: 0 };
-  }
-  
-  function releaseParticle(p) {
-    if (particlePool.length < 100) particlePool.push(p);
-  }
-  
-  function releaseShard(s) {
-    if (shardPool.length < 50) shardPool.push(s);
-  }
-
-  let canvasWidth = 0;
-  let canvasHeight = 0;
 
   function resize() {
     const r = panelEl.getBoundingClientRect();
@@ -1512,78 +475,25 @@ function makePanelFx(canvas, panelEl) {
     canvas.style.width = (r.width + 80) + "px";
     canvas.style.height = (r.height + 80) + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    canvasWidth = r.width + 80;
-    canvasHeight = r.height + 80;
   }
 
   const ro = new ResizeObserver(resize);
   ro.observe(panelEl);
   resize();
 
-  function extravagantBurst(x, y, strength=1, trackWidth=null, pullDistance=null, knob=null) {
-    const n = Math.floor(10 + 15 * strength); // Way fewer particles
-    const parts = fx.burst?.parts || [];
-    
-    // Calculate slider speed during slingshot to match exactly
-    // Slider now uses linear motion at constant speed (no easing)
-    // Slider stops exactly at destination (0 or 1), no overshoot
-    let slingshotSpeedPerFrame;
-    if (trackWidth && pullDistance !== null) {
-      // Calculate actual slingshot duration (with 0.4x multiplier for faster speed)
-      const slingshotDurationMs = (235 - (strength * 55)) * 0.4;
-      const slingshotDuration = slingshotDurationMs / 1000; // Convert to seconds
-      
-      // The slider travels from current position to destination (0 or 1)
-      // Distance is the full track width (normalized to 1)
-      const normalizedDistance = 1; // Full track width, no overshoot
-      const actualDistance = trackWidth * normalizedDistance; // Convert to pixels
-      
-      // Linear motion: constant velocity = distance / time
-      const constantVelocity = actualDistance / slingshotDuration; // pixels per second
-      
-      // Convert to pixels per frame (assuming 60fps)
-      // Reduce speed for small balls (make them slower)
-      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.25; // 25% of slider speed (half of half speed)
-    } else if (trackWidth) {
-      // Fallback: use strength-based calculation
-      const slingshotDurationMs = (235 - (strength * 55)) * 0.4;
-      const slingshotDuration = slingshotDurationMs / 1000;
-      const normalizedDistance = 1; // Full track width, no overshoot
-      const actualDistance = trackWidth * normalizedDistance;
-      const constantVelocity = actualDistance / slingshotDuration;
-      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.25; // 25% of slider speed (half of half speed)
-    } else {
-      // Fallback: estimate from panel width
-      const panelRect = panelEl.getBoundingClientRect();
-      const estimatedTrackWidth = panelRect.width * 0.8;
-      const slingshotDurationMs = (235 - (strength * 55)) * 0.4;
-      const slingshotDuration = slingshotDurationMs / 1000;
-      const normalizedDistance = 1; // Full track width, no overshoot
-      const actualDistance = estimatedTrackWidth * normalizedDistance;
-      const constantVelocity = actualDistance / slingshotDuration;
-      slingshotSpeedPerFrame = (constantVelocity / 60) * 0.25; // 25% of slider speed (half of half speed)
-    }
-    
+  function extravagantBurst(x, y, strength=1) {
+    const n = Math.floor(50 + 80 * strength);
+    const parts = [];
     for (let i=0;i<n;i++){
-      // Explode in all directions like a firework
-      const angle = Math.random() * Math.PI * 2;
-      // Use slingshot speed as base, with more variation for greater dispersion
-      const speed = slingshotSpeedPerFrame * (1.5 + Math.random() * 1.5); // Much faster initial speed
-      
+      const a = Math.random() * Math.PI * 2;
+      const sp = (3.2 + 8.5 * strength) * (0.6 + Math.random()*0.9);
       parts.push({
-        x: x,
-        y: y,
-        vx: Math.cos(angle) * speed, // Speed based on pull distance
-        vy: Math.sin(angle) * speed, // Speed based on pull distance
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
         life: 1,
-        size: 1 + Math.random() * 1.5, // Smaller balls
-        hue: 0, // Will be calculated dynamically
-        settled: false,
-        createdAt: performance.now(), // Track when particle was created
-        knob: knob, // Store reference to source slider knob
-        explosionX: x, // Store explosion position (where knob was when it exploded)
-        explosionY: y, // Store explosion position (where knob was when it exploded)
-        orbitPhase: Math.random() * Math.PI * 2 // Random phase offset for staggered orbiting
+        size: 1.8 + Math.random()*2.8,
+        hue: (Math.random()*360)|0
       });
     }
     fx.burst = { parts };
@@ -1610,94 +520,10 @@ function makePanelFx(canvas, panelEl) {
     fx.rain = { parts };
   }
 
-  function triggerCompletionBurst() {
-    // Get actual panel dimensions (iframe boundaries), not extended canvas
-    const panelRect = panelEl.getBoundingClientRect();
-    const w = panelRect.width;
-    const h = panelRect.height;
-    
-    // White frame effect - lights up around the iframe
-    fx.completion = {
-      frame: { t: 0, w, h }
-    };
-  }
-
   function draw(dt) {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     ctx.clearRect(0,0,w,h);
-    
-    // Get panel dimensions for iframe-constrained effects
-    const panelRect = panelEl.getBoundingClientRect();
-    const canvasRect = canvas.getBoundingClientRect();
-    // Calculate offset from canvas to panel (accounting for -40px inset)
-    const offsetX = panelRect.left - canvasRect.left;
-    const offsetY = panelRect.top - canvasRect.top;
-
-    // White frame effect - lights up around the iframe when both sliders are on one side
-    if (fx.completion) {
-      const comp = fx.completion;
-      const frameW = comp.frame?.w || panelRect.width;
-      const frameH = comp.frame?.h || panelRect.height;
-      
-      if (comp.frame) {
-        comp.frame.t += dt;
-        const frameDuration = 0.42; // shorter + subtler pulse
-        if (comp.frame.t < frameDuration) {
-          const progress = comp.frame.t / frameDuration;
-          // Fade in quickly, hold, then fade out
-          let opacity;
-          if (progress < 0.2) {
-            opacity = progress / 0.2; // Fade in
-          } else if (progress < 0.7) {
-            opacity = 1.0; // Hold
-          } else {
-            opacity = 1.0 * (1 - (progress - 0.7) / 0.3); // Fade out
-          }
-          opacity *= 0.42; // reduce overall strength
-          
-          ctx.save();
-          ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
-          ctx.lineWidth = 2; // thinner frame
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          
-          // Draw white frame around the iframe
-          const frameX = offsetX;
-          const frameY = offsetY;
-          const borderRadius = 22; // Match panel border-radius
-          
-          ctx.beginPath();
-          // Top-left corner to top-right
-          ctx.moveTo(frameX + borderRadius, frameY);
-          ctx.lineTo(frameX + frameW - borderRadius, frameY);
-          // Top-right corner
-          ctx.arc(frameX + frameW - borderRadius, frameY + borderRadius, borderRadius, -Math.PI / 2, 0);
-          // Right side
-          ctx.lineTo(frameX + frameW, frameY + frameH - borderRadius);
-          // Bottom-right corner
-          ctx.arc(frameX + frameW - borderRadius, frameY + frameH - borderRadius, borderRadius, 0, Math.PI / 2);
-          // Bottom side
-          ctx.lineTo(frameX + borderRadius, frameY + frameH);
-          // Bottom-left corner
-          ctx.arc(frameX + borderRadius, frameY + frameH - borderRadius, borderRadius, Math.PI / 2, Math.PI);
-          // Left side
-          ctx.lineTo(frameX, frameY + borderRadius);
-          // Top-left corner
-          ctx.arc(frameX + borderRadius, frameY + borderRadius, borderRadius, Math.PI, -Math.PI / 2);
-          ctx.closePath();
-          ctx.stroke();
-          ctx.restore();
-        } else {
-          comp.frame = null;
-        }
-      }
-      
-      // Clean up when done
-      if (!comp.frame) {
-        fx.completion = null;
-      }
-    }
 
     // Rainbow sweep line effect (visual-only)
     if (fx.rainbow) {
@@ -1727,437 +553,28 @@ function makePanelFx(canvas, panelEl) {
       if (fx.rainbow.t > 0.65) fx.rainbow = null;
     }
 
-    // Firework particles that fall to bottom
+    // Burst particles
     if (fx.burst) {
       const parts = fx.burst.parts;
       ctx.save();
       ctx.globalCompositeOperation = "screen";
-      // Get panel dimensions (iframe boundaries) - exact frame dimensions
-      const panelRect = panelEl.getBoundingClientRect();
-      const panelW = panelRect.width;
-      const panelH = panelRect.height;
-      const canvasOffset = 40; // Canvas has 40px inset
-      const borderRadius = 22; // Match panel border-radius
-      // Use exact frame bottom - no margin
-      const bottomY = panelH + canvasOffset; // Exact bottom of iframe
-      const leftBound = canvasOffset;
-      const rightBound = panelW + canvasOffset;
-      
-      // Helper function to check if particle is within rounded corner bounds
-      function isWithinRoundedBounds(x, y) {
-        const relX = x - canvasOffset;
-        const relY = y - canvasOffset;
-        const cornerRadius = borderRadius;
-        
-        // Check bottom-left corner
-        if (relX < cornerRadius && relY > panelH - cornerRadius) {
-          const dx = relX - cornerRadius;
-          const dy = relY - (panelH - cornerRadius);
-          return (dx * dx + dy * dy) <= (cornerRadius * cornerRadius);
-        }
-        // Check bottom-right corner
-        if (relX > panelW - cornerRadius && relY > panelH - cornerRadius) {
-          const dx = relX - (panelW - cornerRadius);
-          const dy = relY - (panelH - cornerRadius);
-          return (dx * dx + dy * dy) <= (cornerRadius * cornerRadius);
-        }
-        // Within rectangular bounds
-        return relX >= 0 && relX <= panelW && relY >= 0 && relY <= panelH;
-      }
-      
-      // Get audio data once per frame for all particles
-      let audioIntensity = 0;
-      if (audio.analyser && audio.dataArray) {
-        audio.analyser.getByteFrequencyData(audio.dataArray);
-        // Get average intensity from low-mid frequencies (bass/beat range)
-        let sum = 0;
-        const startBin = 0;
-        const endBin = Math.min(32, audio.dataArray.length); // Focus on lower frequencies
-        for (let i = startBin; i < endBin; i++) {
-          sum += audio.dataArray[i];
-        }
-        audioIntensity = (sum / (endBin - startBin)) / 255; // Normalize to 0-1
-      }
-      
       for (const pt of parts) {
-        if (pt.settled) {
-          // Check if settled particle gets disturbed (e.g., by other particles bouncing)
-          // Allow settled particles to become active again if they move
-          if (Math.abs(pt.vx) > 0.01 || Math.abs(pt.vy) > 0.01) {
-            pt.settled = false;
-          } else {
-            // Calculate age and fade out after 2 seconds
-            const age = (performance.now() - pt.createdAt) / 1000; // Age in seconds
-            const fadeStartTime = 2; // Start fading after 2 seconds
-            const fadeDuration = 2; // Fade out over 2 seconds (much slower fade)
-            let fadeAlpha = 1;
-            
-            if (age > fadeStartTime) {
-              // Fade out over fadeDuration seconds
-              const fadeProgress = Math.min((age - fadeStartTime) / fadeDuration, 1);
-              fadeAlpha = 1 - fadeProgress; // Fade from 1 to 0
-            }
-            
-            // Particle has settled at bottom, make it white and solid
-            const settledHue = 0; // Hue doesn't matter for white
-            const settledSaturation = 0; // White has no saturation
-            const settledLightness = 100; // White is maximum lightness
-            const settledAlpha = 1.0; // Solid (fully opaque)
-            
-            // Apply fade-out alpha
-            settledAlpha *= fadeAlpha;
-            
-            // Don't draw if completely faded
-            if (settledAlpha <= 0) {
-              continue;
-            }
-            
-            ctx.fillStyle = `hsla(${settledHue}, ${settledSaturation}%, ${settledLightness}%, ${settledAlpha})`;
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2);
-            ctx.fill();
-            continue;
-          }
-        }
-        
-        // First explode outward, then slowly circle back to knob
-        let merged = false;
-        if (pt.explosionX !== undefined && pt.explosionY !== undefined) {
-          // Use the stored explosion position (where the knob was when it exploded)
-          const targetX = pt.explosionX;
-          const targetY = pt.explosionY;
-          
-          // Calculate distance and direction to explosion position
-          const dx = pt.x - targetX;
-          const dy = pt.y - targetY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          // Calculate particle age
-          const age = (performance.now() - pt.createdAt) / 1000; // Age in seconds
-          const explosionPhase = 0.3; // Time for initial explosion (0.3 seconds)
-          const orbitStartPhase = 1.5; // When to start orbiting back (1.5 seconds - longer float time)
-          
-          // Merge threshold: when particle gets very close to explosion position, it merges back
-          const mergeRadius = 15; // Distance at which particle merges back into knob
-          const orbitRadius = 40; // Preferred orbit radius
-          
-          // Phase 1: Explosion - let particles fly outward naturally
-          if (age < explosionPhase) {
-            // Just let them explode - no orbital motion yet
-            // Particles will naturally move outward from initial velocity
-          }
-          // Phase 2: Start pulling back and orbiting
-          else if (age >= orbitStartPhase) {
-            // Check if particle has moved away from spawn point
-            const spawnDist = Math.sqrt((pt.x - pt.explosionX) ** 2 + (pt.y - pt.explosionY) ** 2);
-            const hasMovedAway = spawnDist > mergeRadius * 2;
-            
-            if (hasMovedAway && dist < mergeRadius) {
-              // Particle has moved away and come back close enough to merge - mark for removal
-              merged = true;
-              pt.merged = true; // Mark as merged so it's removed
-            } else if (dist > mergeRadius && dist > 0.1) {
-              // Create very slow orbital motion around the knob with staggered phases
-              const orbitalSpeed = 0.05; // Very slow orbital speed (radians per second)
-              
-              // Calculate current angle from center
-              const currentAngle = Math.atan2(dy, dx);
-              
-              // Use orbit phase offset for staggering (default to 0 if not set)
-              const phaseOffset = pt.orbitPhase || 0;
-              
-              // Calculate desired orbital velocity (tangential to circle)
-              // Perpendicular to radius vector: rotate by 90 degrees, add phase offset
-              const tangentAngle = currentAngle + Math.PI / 2 + phaseOffset;
-              
-              // Orbital velocity magnitude - constant speed for smooth orbit
-              const orbitalVelocity = orbitalSpeed * dt * 60;
-              
-              // Apply orbital velocity (tangential) - normalized by distance to maintain constant angular velocity
-              const angularVelocity = orbitalVelocity / Math.max(dist, 1); // Prevent division by zero
-              pt.vx += Math.cos(tangentAngle) * angularVelocity * dist;
-              pt.vy += Math.sin(tangentAngle) * angularVelocity * dist;
-              
-              // Apply stronger pull toward orbit radius
-              const pullStrength = 0.15; // Stronger magnetic pull toward knob
-              const distFromOrbit = dist - orbitRadius;
-              const pullForce = pullStrength * distFromOrbit * dt * 60;
-              if (dist > 0) {
-                pt.vx -= (dx / dist) * pullForce;
-                pt.vy -= (dy / dist) * pullForce;
-              }
-            }
-          }
-          // Phase 2.5: Transition phase - start gentle pull
-          else {
-            // Stronger pull toward center to start bringing them back
-            const pullStrength = 0.1; // Stronger magnetic pull
-            if (dist > orbitRadius && dist > 0.1) {
-              pt.vx -= (dx / dist) * pullStrength * dt * 60;
-              pt.vy -= (dy / dist) * pullStrength * dt * 60;
-            }
-          }
-        }
-        
-        // Skip processing if merged
-        if (merged) {
-          continue;
-        }
-        
-        pt.vx *= 0.98; // More friction for much slower movement
-        
-        // Update position
         pt.x += pt.vx;
         pt.y += pt.vy;
-        
-        // Helper function to check if point is inside rounded rectangle (accounting for particle size)
-        function isInsideRoundedRect(x, y, size) {
-          const relX = x - canvasOffset;
-          const relY = y - canvasOffset;
-          const r = borderRadius;
-          const margin = size + 1.5; // Increased margin to keep particles further inside
-          
-          // Check if outside basic rectangle bounds (with margin)
-          if (relX < margin || relX > panelW - margin || relY < margin || relY > panelH - margin) {
-            return false;
-          }
-          
-          // Check bottom-left corner
-          if (relX < r && relY > panelH - r) {
-            const cornerX = r;
-            const cornerY = panelH - r;
-            const dx = relX - cornerX;
-            const dy = relY - cornerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            return dist <= (r - margin);
-          }
-          
-          // Check bottom-right corner
-          if (relX > panelW - r && relY > panelH - r) {
-            const cornerX = panelW - r;
-            const cornerY = panelH - r;
-            const dx = relX - cornerX;
-            const dy = relY - cornerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            return dist <= (r - margin);
-          }
-          
-          // Check top-left corner
-          if (relX < r && relY < r) {
-            const cornerX = r;
-            const cornerY = r;
-            const dx = relX - cornerX;
-            const dy = relY - cornerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            return dist <= (r - margin);
-          }
-          
-          // Check top-right corner
-          if (relX > panelW - r && relY < r) {
-            const cornerX = panelW - r;
-            const cornerY = r;
-            const dx = relX - cornerX;
-            const dy = relY - cornerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            return dist <= (r - margin);
-          }
-          
-          // Inside rectangular area (not in corners)
-          return true;
+        pt.vx *= 0.93;
+        pt.vy *= 0.93;
+        pt.life -= 0.020;
+
+        if (pt.life > 0) {
+          ctx.fillStyle = `hsla(${pt.hue}, 95%, 62%, ${Math.max(0, pt.life)})`;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2);
+          ctx.fill();
         }
-        
-        // Constrain particle to stay inside rounded rectangle
-        const relX = pt.x - canvasOffset;
-        const relY = pt.y - canvasOffset;
-        const r = borderRadius;
-        const margin = pt.size + 1.5; // Increased margin to keep particles further inside
-        
-        // Check if particle is outside bounds and push it back in with bounce
-        if (!isInsideRoundedRect(pt.x, pt.y, pt.size)) {
-          const isInTopLeftCorner = relX < r && relY < r;
-          const isInTopRightCorner = relX > panelW - r && relY < r;
-          const isInBottomLeftCorner = relX < r && relY > panelH - r;
-          const isInBottomRightCorner = relX > panelW - r && relY > panelH - r;
-          
-          // Handle corners first
-          if (isInTopLeftCorner) {
-            // Top-left corner - bounce off curve
-            const cornerX = canvasOffset + r;
-            const cornerY = canvasOffset + r;
-            const dx = pt.x - cornerX;
-            const dy = pt.y - cornerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const maxDist = r - margin;
-            if (dist > maxDist) {
-              const angle = Math.atan2(dy, dx);
-              pt.x = cornerX + Math.cos(angle) * maxDist;
-              pt.y = cornerY + Math.sin(angle) * maxDist;
-              // Bounce off corner curve
-              const normalAngle = angle + Math.PI;
-              const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
-              pt.vx = Math.cos(normalAngle) * bounceSpeed;
-              pt.vy = Math.sin(normalAngle) * bounceSpeed;
-            }
-          } else if (isInTopRightCorner) {
-            // Top-right corner - bounce off curve
-            const cornerX = canvasOffset + panelW - r;
-            const cornerY = canvasOffset + r;
-            const dx = pt.x - cornerX;
-            const dy = pt.y - cornerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const maxDist = r - margin;
-            if (dist > maxDist) {
-              const angle = Math.atan2(dy, dx);
-              pt.x = cornerX + Math.cos(angle) * maxDist;
-              pt.y = cornerY + Math.sin(angle) * maxDist;
-              // Bounce off corner curve
-              const normalAngle = angle + Math.PI;
-              const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
-              pt.vx = Math.cos(normalAngle) * bounceSpeed;
-              pt.vy = Math.sin(normalAngle) * bounceSpeed;
-            }
-          } else if (isInBottomLeftCorner) {
-            // Bottom-left corner - bounce off curve
-            const cornerX = canvasOffset + r;
-            const cornerY = canvasOffset + panelH - r;
-            const dx = pt.x - cornerX;
-            const dy = pt.y - cornerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const maxDist = r - margin;
-            if (dist > maxDist) {
-              const angle = Math.atan2(dy, dx);
-              pt.x = cornerX + Math.cos(angle) * maxDist;
-              pt.y = cornerY + Math.sin(angle) * maxDist;
-              // Bounce off corner curve
-              const normalAngle = angle + Math.PI;
-              const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
-              pt.vx = Math.cos(normalAngle) * bounceSpeed;
-              pt.vy = Math.sin(normalAngle) * bounceSpeed;
-            }
-          } else if (isInBottomRightCorner) {
-            // Bottom-right corner - bounce off curve
-            const cornerX = canvasOffset + panelW - r;
-            const cornerY = canvasOffset + panelH - r;
-            const dx = pt.x - cornerX;
-            const dy = pt.y - cornerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const maxDist = r - margin;
-            if (dist > maxDist) {
-              const angle = Math.atan2(dy, dx);
-              pt.x = cornerX + Math.cos(angle) * maxDist;
-              pt.y = cornerY + Math.sin(angle) * maxDist;
-              // Bounce off corner curve
-              const normalAngle = angle + Math.PI;
-              const bounceSpeed = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy) * 0.3;
-              pt.vx = Math.cos(normalAngle) * bounceSpeed;
-              pt.vy = Math.sin(normalAngle) * bounceSpeed;
-            }
-          } else {
-            // Handle flat edges - bounce off all sides
-            if (relX < margin) {
-              // Left edge
-              pt.x = canvasOffset + margin;
-              pt.vx *= -0.3; // Bounce off left
-            } else if (relX > panelW - margin) {
-              // Right edge
-              pt.x = canvasOffset + panelW - margin;
-              pt.vx *= -0.3; // Bounce off right
-            }
-            
-            if (relY < margin) {
-              // Top edge
-              pt.y = canvasOffset + margin;
-              pt.vy *= -0.3; // Bounce off top
-            } else if (relY > panelH - margin) {
-              // Bottom edge
-              pt.y = canvasOffset + panelH - margin;
-              pt.vy *= -0.3; // Bounce off bottom
-            }
-          }
-        }
-        
-        // Bounce off all edges - this is now handled in the constraint check above
-        // Removed duplicate bottom check to avoid conflicts
-        
-        // Calculate fade-out after 4 seconds
-        const age = (performance.now() - pt.createdAt) / 1000; // Age in seconds
-        const fadeStartTime = 4.0; // Start fading after 4 seconds
-        const fadeDuration = 1.0; // Fade out over 1 second
-        let fadeAlpha = 1.0;
-        
-        if (age > fadeStartTime) {
-          // Fade out over fadeDuration seconds
-          const fadeProgress = Math.min((age - fadeStartTime) / fadeDuration, 1);
-          fadeAlpha = 1 - fadeProgress; // Fade from 1 to 0
-        }
-        
-        // Make balls white and solid
-        const particleHue = 0; // Hue doesn't matter for white
-        const particleSaturation = 0; // White has no saturation
-        const particleLightness = 100; // White is maximum lightness
-        let particleAlpha = 1.0; // Fully opaque
-        
-        // Apply fade-out alpha
-        particleAlpha *= fadeAlpha;
-        
-        // Don't draw if completely faded
-        if (particleAlpha <= 0) {
-          continue;
-        }
-        
-        ctx.fillStyle = `hsla(${particleHue}, ${particleSaturation}%, ${particleLightness}%, ${particleAlpha})`;
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2);
-        ctx.fill();
       }
       ctx.restore();
-      
-      // Track merge progress for knob fade-in synchronization
-      const knobsWithParticles = new Map(); // Map of knob -> {total, merged, close}
-      
-      // First pass: count particles per knob
-      for (const p of parts) {
-        if (p.knob) {
-          if (!knobsWithParticles.has(p.knob)) {
-            knobsWithParticles.set(p.knob, { total: 0, merged: 0, close: 0 });
-          }
-          const stats = knobsWithParticles.get(p.knob);
-          stats.total++;
-          
-          if (p.merged) {
-            stats.merged++;
-          } else {
-            // Check if particle is close to merging - use explosion position
-            if (p.explosionX !== undefined && p.explosionY !== undefined) {
-              const dx = p.explosionX - p.x;
-              const dy = p.explosionY - p.y;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              const mergeRadius = 15;
-              const closeThreshold = mergeRadius * 3; // Consider "close" when within 3x merge radius
-              if (dist < closeThreshold) {
-                stats.close++;
-              }
-            }
-          }
-        }
-      }
-      
-      // Remove particles that have merged back into knob or faded out (after 5 seconds total)
-      const now = performance.now();
-      fx.burst.parts = parts.filter(p => {
-        if (p.merged) return false; // Remove merged particles
-        const age = (now - p.createdAt) / 1000;
-        return age < 5; // Remove after 5 seconds (4s visible + 1s fade)
-      });
-      
-      // Knob fade-in is now handled independently by setTimeout in the slider code
-      // No particle-based fade-in logic needed here
-      
-      // Limit total particles to prevent memory issues
-      if (fx.burst.parts.length > 2000) {
-        // Remove oldest particles if too many
-        fx.burst.parts = fx.burst.parts.filter(() => Math.random() > 0.1);
-      }
+      fx.burst.parts = parts.filter(p => p.life > 0);
+      if (fx.burst.parts.length === 0) fx.burst = null;
     }
 
     // Rain
@@ -2197,7 +614,6 @@ function makePanelFx(canvas, panelEl) {
     extravagantBurst,
     startRainbowSweep,
     startRain,
-    triggerCompletionBurst,
   };
 }
 
@@ -2209,13 +625,31 @@ const rewardWaveEl = document.getElementById("rewardWave");
 let rewardArmed = true;
 
 function runRewardWave(){
-  // Rainbow flash effect removed
-  // Function kept for compatibility but does nothing
+  if (!rewardArmed) return;
+  rewardArmed = false;
+  rewardWaveEl.classList.remove("run");
+  // reflow
+  void rewardWaveEl.offsetWidth;
+  rewardWaveEl.classList.add("run");
+  setTimeout(() => {
+    rewardArmed = true; // can trigger again if they leave and re-enter
+  }, 900);
 }
 
 /* =========================
    EASTER EGG (bottom knob vertical pull ONLY when both right)
 ========================= */
+
+const couponEl = document.getElementById("coupon");
+const couponCodeEl = document.getElementById("couponCode");
+const COUPON_CODE = "QUAD50";
+
+function showCoupon(){
+  couponCodeEl.textContent = COUPON_CODE;
+  couponEl.classList.add("show");
+  // auto-hide after a bit
+  setTimeout(() => couponEl.classList.remove("show"), 6500);
+}
 
 /* =========================
    SLIDER ENGINE
@@ -2239,7 +673,6 @@ function makeSlider(opts){
   let canSlingshot = false;
   let slingshotEdge = null;
   let dragStartTime = 0;
-  let knobHidden = false; // Track if knob is hidden after explosion
 
   let lastSettleTime = performance.now();
 
@@ -2247,24 +680,10 @@ function makeSlider(opts){
   let vPullEnabled = !!opts.verticalEgg;
   let vPulling = false;
   let vStartY = 0;
-  let vStartX = 0;
   let vOffset = 0;
 
   // Overpull clamp: knob always visible, hard stop holdable
   const OVERPULL_MAX = 0.34; // allow bigger than before but not infinite
-  
-  // Morph slingshot constants
-  const MAX_OVERSCROLL = 0.15; // Maximum overscroll distance (normalized) for morphing
-  const STRETCH_THRESHOLD = 0.25; // Minimum stretch to trigger slingshot
-  const MORPH_SCALE_X = 0.65; // Horizontal stretch multiplier (more dramatic)
-  const MORPH_SCALE_Y = 0.35; // Vertical compression multiplier (more dramatic)
-  const MORPH_BULGE_FACTOR = 0.6; // How much the front bulges forward
-  
-  // Morph state
-  let overscroll = 0; // How far beyond endpoint the pointer would be (0-1 normalized)
-  let stretch = 0; // Computed stretch amount (0-1)
-  let dragDirection = 0; // -1 for left, 1 for right, 0 for none
-  let morphShake = 0; // Current shake offset
 
   function trackRect(){
     // track area is wrap inner content after padding
@@ -2282,56 +701,13 @@ function makeSlider(opts){
   }
 
   function setKnobFromDisplay(){
-    // Don't update position if knob is hidden
-    if (knobHidden || knob.style.display === "none") {
-      return;
-    }
-    
     const { r, pl, w } = trackRect();
 
-    // Calculate overscroll for morphing - based on how far display goes beyond 0-1
-    if (isDown) {
-      const clampedDisplay = Math.max(0, Math.min(1, display));
-      const atLeftEdge = clampedDisplay <= 0.001;
-      const atRightEdge = clampedDisplay >= 0.999;
-      
-      // Check if pulling back from edge
-      const pullingBack = (atLeftEdge && target > 0.01) || (atRightEdge && target < 0.99);
-      
-      if (display < 0) {
-        overscroll = Math.abs(display);
-        dragDirection = -1;
-      } else if (display > 1) {
-        overscroll = display - 1;
-        dragDirection = 1;
-      } else if (pullingBack) {
-        overscroll = 0;
-        dragDirection = 0;
-      } else if (atLeftEdge) {
-        overscroll = 0.01;
-        dragDirection = -1;
-      } else if (atRightEdge) {
-        overscroll = 0.01;
-        dragDirection = 1;
-      } else {
-        overscroll = 0;
-        dragDirection = 0;
-      }
-      
-      stretch = Math.min(1, overscroll / MAX_OVERSCROLL);
-      if ((atLeftEdge || atRightEdge) && !pullingBack && stretch < 0.15) {
-        stretch = 0.15;
-      }
-    } else {
-      overscroll = 0;
-      stretch = 0;
-      dragDirection = 0;
-    }
-    
-    // Use original OVERPULL_MAX logic for visual position (allows ball to go slightly past)
+    // keep knob visible: clamp visual position to [-OVERPULL_MAX, 1+OVERPULL_MAX]
     const d = Math.max(-OVERPULL_MAX, Math.min(1+OVERPULL_MAX, display));
 
     // compute pixel position along track, then clamp within a hard stop range that stays on screen
+    // hard stop distance is inside wrap because we have end padding.
     const x = pl + (d * w);
     const xMin = pl + (-OVERPULL_MAX * w);
     const xMax = pl + ((1+OVERPULL_MAX) * w);
@@ -2342,73 +718,9 @@ function makeSlider(opts){
 
     knob.style.left = pct + "%";
     knob.style.top = "50%";
-    
-    // Apply morphing transforms
-    applyMorphTransform();
+    knob.style.transform = `translate(-50%, -50%)${knob.classList.contains("isDown") ? " scale(var(--knobPress))" : ""}`;
 
     knob.setAttribute("aria-valuenow", String(Math.max(0, Math.min(1, value))));
-  }
-  
-  function applyMorphTransform() {
-    // Don't apply transforms if knob is hidden
-    if (knobHidden || knob.style.display === "none") {
-      return;
-    }
-    
-    const isPressed = knob.classList.contains("isDown");
-    const baseScale = isPressed ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--knobPress')) || 1.4 : 1;
-    
-    // Calculate morph scales (more dramatic)
-    const scaleX = 1 + (MORPH_SCALE_X * stretch);
-    const scaleY = 1 - (MORPH_SCALE_Y * stretch);
-    
-    // Apply shake if stretch is high
-    if (stretch > 0.75) {
-      const shakeIntensity = (stretch - 0.75) / 0.25;
-      morphShake = (Math.random() - 0.5) * 1.2 * shakeIntensity * 0.4; // More dramatic shake
-    } else {
-      morphShake = 0;
-    }
-    
-    // Build transform string
-    let transform = `translate(-50%, -50%)`;
-    
-    // Apply base press scale
-    if (isPressed) {
-      transform += ` scale(${baseScale})`;
-    }
-    
-    // Apply morph scaling (after base scale) - more dramatic
-    if (stretch > 0) {
-      // Rotate to align with drag direction, then scale
-      const angle = dragDirection === 1 ? 0 : Math.PI; // 0 for right, 180 for left
-      transform += ` rotate(${angle}rad) scale(${scaleX}, ${scaleY}) rotate(${-angle}rad)`;
-    }
-    
-    // Apply shake offset
-    if (morphShake !== 0) {
-      transform += ` translate(${morphShake}px, 0)`;
-    }
-    
-    knob.style.transform = transform;
-    
-    // Apply clip-path for dramatic teardrop shape when stretched
-    if (stretch > 0.05) {
-      const knobSize = parseFloat(getComputedStyle(knob).width) || 28;
-      const radius = knobSize / 2;
-      const bulge = radius * (1 + stretch * MORPH_BULGE_FACTOR); // More dramatic bulge forward
-      const tailCompress = radius * (1 - stretch * 0.3); // Compress back more
-      
-      if (dragDirection === 1) {
-        // Stretching right - bulge points right
-        knob.style.clipPath = `ellipse(${bulge}px ${radius * scaleY}px at ${bulge}px 50%)`;
-      } else if (dragDirection === -1) {
-        // Stretching left - bulge points left
-        knob.style.clipPath = `ellipse(${bulge}px ${radius * scaleY}px at ${radius - bulge + radius}px 50%)`;
-      }
-    } else {
-      knob.style.clipPath = "";
-    }
   }
 
   function rubber(v){
@@ -2446,7 +758,6 @@ function makeSlider(opts){
   }
 
   function pulledAmount(){
-    // Use original logic: calculate based on display going beyond 0-1
     const d = Math.max(-OVERPULL_MAX, Math.min(1+OVERPULL_MAX, display));
     if (slingshotEdge === "left")  return Math.max(0, -d);
     if (slingshotEdge === "right") return Math.max(0, d - 1);
@@ -2469,135 +780,41 @@ function makeSlider(opts){
     const strength = Math.min(1.0, pulled / 0.12);
     const dest = (slingshotEdge === "left") ? 1 : 0;
     const dir = (dest === 1) ? 1 : -1;
-    
-    // Pass the actual pull distance for particle speed calculation
-    const pullDistance = pulled; // Actual distance pulled past the line
 
-    opts.onSlingshot?.({ strength, dir, wrap, knob, pullDistance });
-
-    // Reset morph state before launch
-    stretch = 0;
-    overscroll = 0;
-    dragDirection = 0;
+    opts.onSlingshot?.({ strength, dir, wrap, knob });
 
     const from = display;
     const start = performance.now();
-    const dur = (235 - (strength * 55)) * 0.4; // Much faster slingshot (0.4x duration)
+    const dur = 235 - (strength * 55);
 
-    let exploded = false; // Track if explosion has happened
-    let explosionTime = 0; // Time when explosion happened
-    
+    function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
     function tick(now){
       const t = Math.min(1, (now - start) / dur);
+      const k = easeOutCubic(t);
 
-      // Linear motion at constant speed, then instantly stop at end
-      if (t < 1) {
-        // Constant speed: linear interpolation
-        display = from + (dest - from) * t;
-        setKnobFromDisplay();
+      const overshoot = 0.12 + 0.14 * strength;
+      const overshotDest = (dest === 1) ? (1 + overshoot) : (0 - overshoot);
+
+      if (t < 0.78){
+        display = from + (overshotDest - from) * (k / 0.78);
       } else {
-        // Instantly stop at destination - explode when hitting the wall
-        display = dest;
-        setKnobFromDisplay(); // Set position first
-        
-        // Only hide knob and create explosion if full speed slingshot
-        if (!exploded && strength >= 0.95) {
-          exploded = true;
-          explosionTime = now;
-          knobHidden = true;
-          
-          // Get knob position for explosion BEFORE hiding (at the wall)
-          const knobRect = knob.getBoundingClientRect();
-          const panelRect = panelEl.getBoundingClientRect();
-          const explosionX = (knobRect.left - panelRect.left) + (knobRect.width / 2) + 40; // Account for canvas offset
-          const explosionY = (knobRect.top - panelRect.top) + (knobRect.height / 2) + 40;
-          
-          // Completely hide knob immediately - use !important via setProperty to override any styles
-          knob.style.setProperty('transition', 'none', 'important');
-          knob.style.setProperty('opacity', '0', 'important');
-          knob.style.setProperty('visibility', 'hidden', 'important');
-          knob.style.setProperty('display', 'none', 'important');
-          knob.style.setProperty('pointer-events', 'none', 'important');
-          knob.style.setProperty('width', '0', 'important');
-          knob.style.setProperty('height', '0', 'important');
-          knob.style.setProperty('transform', 'scale(0)', 'important');
-          knob.style.setProperty('box-shadow', 'none', 'important');
-          knob.style.setProperty('left', knob.style.left, 'important'); // Preserve position
-          knob.style.setProperty('top', knob.style.top, 'important'); // Preserve position
-          
-          if (glow) {
-            glow.style.setProperty('opacity', '0', 'important');
-            glow.style.setProperty('visibility', 'hidden', 'important');
-            glow.style.setProperty('display', 'none', 'important');
-            glow.style.setProperty('pointer-events', 'none', 'important');
-          }
-          
-          // Create explosion at knob position
-          const trackWidth = wrap.getBoundingClientRect().width;
-          panelFx.extravagantBurst(explosionX, explosionY, strength, trackWidth, pullDistance, knob);
-        }
+        const t2 = (t - 0.78) / 0.22;
+        display = overshotDest + (dest - overshotDest) * (1 - Math.pow(1 - t2, 2));
       }
 
-      // Clamp to valid range (0 to 1)
-      display = Math.max(0, Math.min(1, display));
+      display = Math.max(-OVERPULL_MAX, Math.min(1+OVERPULL_MAX, display));
+      setKnobFromDisplay();
 
       if (t < 1) requestAnimationFrame(tick);
       else {
         value = dest;
         target = dest;
         display = dest;
-        
-        // Only fade in knob if it was actually hidden (i.e., explosion happened)
-        if (knobHidden) {
-          // Fade in knob independently after a fixed delay
-          const fadeDelay = 2000; // Start fading in after 2 seconds
-          const fadeDuration = 3000; // Fade in slowly over 3 seconds
-          
-          // Start fade in after delay - independent of particles
-          setTimeout(() => {
-            // First, restore display and visibility (but keep opacity at 0 for fade)
-            knob.style.removeProperty('display');
-            knob.style.removeProperty('visibility');
-            knob.style.removeProperty('pointer-events');
-            knob.style.removeProperty('width');
-            knob.style.removeProperty('height');
-            knob.style.removeProperty('transform');
-            knob.style.removeProperty('box-shadow');
-            
-            // Restore normal styles but keep opacity at 0 initially
-            knob.style.display = "";
-            knob.style.visibility = "visible";
-            knob.style.pointerEvents = "";
-            knob.style.width = "";
-            knob.style.height = "";
-            knob.style.transform = "";
-            knob.style.boxShadow = "";
-            
-            // Set opacity to 0 first, then apply transition and fade to 1
-            knob.style.opacity = "0";
-            
-            // Use requestAnimationFrame to ensure the 0 opacity is applied before transition
-            requestAnimationFrame(() => {
-              knob.style.transition = `opacity ${fadeDuration}ms linear`;
-              knob.style.opacity = "1";
-              knobHidden = false; // Re-enable interaction as it fades in
-            });
-            
-            // Also restore glow
-            if (glow) {
-              glow.style.removeProperty('opacity');
-              glow.style.removeProperty('visibility');
-              glow.style.removeProperty('display');
-              glow.style.removeProperty('pointer-events');
-              glow.style.display = "";
-              glow.style.visibility = "visible";
-            }
-          }, fadeDelay);
-        }
-        
+        setKnobFromDisplay();
         lastSettleTime = performance.now();
         opts.onChange?.(value);
-        opts.onSlingshotLand?.({ strength, dest, wrap, knob, pullDistance });
+        opts.onSlingshotLand?.({ strength, dest, wrap, knob });
       }
     }
     requestAnimationFrame(tick);
@@ -2613,58 +830,23 @@ function makeSlider(opts){
   }
 
   async function gestureStartAudio(){
-    // improves iOS reliability: try resume on any pointerdown (user gesture)
+    // improves iOS reliability: try resume on any pointerdown
     try {
-      if (!audio.ctx) {
-        await initAudio();
-      }
-      // iOS: resume must be called from user gesture
-      if (audio.ctx && audio.ctx.state !== 'running') {
-        await audio.ctx.resume();
-      }
-      // If not started yet, start audio on first gesture
-      if (!audio.started) {
-        await ensureStarted();
-        applyMix();
-      }
-      // If context is running and we have started audio, we're playing
-      if (audio.ctx && audio.ctx.state === 'running' && audio.started) {
-        audio.playing = true;
-        updatePlayButton();
-      }
-    } catch (err) {
-      console.warn("gestureStartAudio failed:", err);
-    }
+      await initAudio();
+      await audio.ctx.resume();
+    } catch {}
   }
 
   function onDown(e){
     if (isDown) return;
-    // Prevent interaction if knob is hidden (opacity is 0 or very low)
-    const knobOpacity = parseFloat(knob.style.opacity) || 1;
-    if (knobOpacity < 0.1) return;
-    // Let touch gestures keep vertical page scroll behavior.
-    if (e.pointerType !== "touch" && e.pointerType !== "pen" && e.cancelable) {
-      e.preventDefault();
-    }
-
-    // Mark user interaction and show loading if visualizer doesn't have data yet
-    userHasInteracted = true;
-    if (!visualizerHasData) {
-      showLoadingIndicator();
-    }
-
-    // Start audio as soon as user touches slider (same as play button) so visualizer doesn't load endlessly
-    opts.onFirstInteract?.();
+    e.preventDefault();
 
     // iOS audio: attempt resume on gesture
     gestureStartAudio();
 
     isDown = true;
     pointerId = e.pointerId;
-    // Do not capture touch pointers so vertical page scrolling can continue naturally.
-    if (e.pointerType !== "touch" && e.pointerType !== "pen" && wrap.setPointerCapture) {
-      wrap.setPointerCapture(pointerId);
-    }
+    wrap.setPointerCapture(pointerId);
     knob.classList.add("isDown");
 
     // Determine if slingshot can arm (edge + settled)
@@ -2675,7 +857,6 @@ function makeSlider(opts){
 
     // IMPORTANT FIX:
     // If we're in edge-lock/slingshot mode, only start if they grabbed the knob itself.
-    // For normal interaction, allow clicking anywhere in the trackWrap hitbox
     if (canSlingshot && e.target !== knob) {
       // keep it locked, do not yank it off-edge from big hitbox
       isDown = false;
@@ -2685,71 +866,53 @@ function makeSlider(opts){
       slingshotEdge = null;
       return;
     }
-    
-    // Normal interaction: clicking anywhere in trackWrap (including track area) should work
-    // The event listener is on wrap, so e.target will be wrap when clicking on empty trackWrap area
-    // or knob when clicking on knob, or track (but track has pointer-events: none so it passes through)
 
     // Easter egg vertical pull (bottom slider only): only when BOTH sliders right AND bottom at right AND slingshot-armed
     if (vPullEnabled && opts.canEggPull?.() && slingshotEdge === "right") {
       vPulling = true;
       vStartY = e.clientY;
-      vStartX = e.clientX;
       vOffset = 0;
     }
 
     const v = pxToValue(e.clientX);
-    
-    // Allow target to go beyond 0-1 for overscroll calculation
-    // Visual position will be clamped in setKnobFromDisplay
-    target = v;
+
+    if (canSlingshot && slingshotEdge === "left") {
+      target = (v < 0) ? rubber(v) : v;
+    } else if (canSlingshot && slingshotEdge === "right") {
+      target = (v > 1) ? rubber(v) : v;
+    } else {
+      target = v;
+    }
   }
 
   function onMove(e){
     if (!isDown || e.pointerId !== pointerId) return;
-    if (e.pointerType !== "touch" && e.pointerType !== "pen" && e.cancelable) {
-      e.preventDefault();
-    }
+    e.preventDefault();
 
     // Easter egg vertical pull tracking
     if (vPullEnabled && vPulling) {
-      const dx = Math.abs(e.clientX - vStartX);
       const dy = e.clientY - vStartY;
-      
-      // If user moves horizontally significantly, exit vertical pull mode and allow normal slider movement
-      if (dx > 15) {
-        vPulling = false;
-        vOffset = 0;
-        knob.style.top = "50%";
-        // Continue with normal horizontal movement below
-      } else {
-        // allow pulling DOWN only
-        vOffset = Math.max(0, Math.min(140, dy));
-        // visual: move knob down while staying on right edge
-        knob.style.top = `calc(50% + ${vOffset}px)`;
-        return;
-      }
+      // allow pulling DOWN only
+      vOffset = Math.max(0, Math.min(140, dy));
+      // visual: move knob down while staying on right edge
+      knob.style.top = `calc(50% + ${vOffset}px)`;
+      return;
     }
 
     const v = pxToValue(e.clientX);
-    
-    // Allow target to go beyond 0-1 for overscroll calculation
-    // Visual position will be clamped in setKnobFromDisplay
-    target = v;
-    
-    // Update audio mix immediately during dragging for real-time feedback
-    // Use clamped value for audio (0-1 range)
-    const clampedTarget = Math.max(0, Math.min(1, target));
-    if (opts.onChange) {
-      opts.onChange(clampedTarget);
+
+    if (canSlingshot && slingshotEdge === "left") {
+      target = (v < 0) ? rubber(v) : v;
+    } else if (canSlingshot && slingshotEdge === "right") {
+      target = (v > 1) ? rubber(v) : v;
+    } else {
+      target = v;
     }
   }
 
   function onUp(e){
     if (!isDown || e.pointerId !== pointerId) return;
-    if (e.pointerType !== "touch" && e.pointerType !== "pen" && e.cancelable) {
-      e.preventDefault();
-    }
+    e.preventDefault();
 
     isDown = false;
     knob.classList.remove("isDown");
@@ -2811,20 +974,12 @@ function makeSlider(opts){
   }
 
   function animate(){
-    // Half drag (much more responsive): increase follow factor significantly
-    const follow = isDown ? 0.6 : 0.5;
-    const prevDisplay = display;
+    // 20% less drag (more responsive): increase follow factor
+    const follow = isDown ? 0.275 : 0.225;
     display = display + (target - display) * follow;
 
     display = Math.max(-OVERPULL_MAX, Math.min(1+OVERPULL_MAX, display));
     setKnobFromDisplay();
-    
-    // Update audio mix during dragging if display changed significantly
-    // This ensures smooth audio crossfading while dragging
-    if (isDown && Math.abs(display - prevDisplay) > 0.001 && opts.onChange) {
-      const clampedDisplay = Math.max(0, Math.min(1, display));
-      opts.onChange(clampedDisplay);
-    }
 
     // speed-based glow: brightness depends on motion speed
     const v = Math.abs(display - lastDisplay) / (16.7 / 1000);
@@ -2851,7 +1006,7 @@ function makeSlider(opts){
   window.addEventListener("pointerup", onUp, { passive: false });
   window.addEventListener("pointercancel", onUp, { passive: false });
 
-  const sliderAPI = {
+  return {
     get value(){ return Math.max(0, Math.min(1, value)); },
     set value(v){
       value = Math.max(0, Math.min(1, v));
@@ -2859,11 +1014,8 @@ function makeSlider(opts){
       display = value;
       setKnobFromDisplay();
       opts.onChange?.(value);
-    },
-    getDisplayValue: () => Math.max(0, Math.min(1, display))
+    }
   };
-  
-  return sliderAPI;
 }
 
 /* =========================
@@ -2876,11 +1028,11 @@ const panelFx = makePanelFx(document.getElementById("panelFx"), panelEl);
 const btnPlay = document.getElementById("btnPlay");
 
 let tone = 0;
-let beatOn = true;
+let blend = 0;
 
 function applyMix(){
   if (!audio.ctx) return;
-  setMix(tone, beatOn);
+  setMix(tone, blend);
 }
 
 let firstGestureDone = false;
@@ -2888,54 +1040,30 @@ let firstGestureDone = false;
 async function onFirstInteract(){
   if (firstGestureDone) return;
   firstGestureDone = true;
-  userHasInteracted = true;
-  visualizerHasData = false;
-  if (!visualizerHasData) {
-    showLoadingIndicator();
-  }
   try {
     await play();
     applyMix();
-    updatePlayButton();
   } catch (err) {
     console.error(err);
-    hideLoadingIndicator();
-    updatePlayButton();
   }
 }
 
 btnPlay.addEventListener("click", async (e) => {
   e.preventDefault();
-  userHasInteracted = true;
   try{
     // iOS: click is a safe gesture; force resume
     await initAudio();
     await audio.ctx.resume();
 
     if (!audio.started) {
-      visualizerHasData = false;
-      if (!visualizerHasData) {
-        showLoadingIndicator();
-      }
       await play();
       applyMix();
-      updatePlayButton();
       return;
     }
-    if (audio.playing) {
-      await pause();
-    } else {
-      visualizerHasData = false; // Reset when starting to play
-      if (userHasInteracted) {
-        showLoadingIndicator();
-      }
-      await play();
-    }
-    updatePlayButton();
+    if (audio.playing) await pause();
+    else await play();
   } catch (err){
     console.error(err);
-    hideLoadingIndicator();
-    updatePlayButton();
   }
 }, { passive:false });
 
@@ -2943,38 +1071,21 @@ btnPlay.addEventListener("click", async (e) => {
 window.addEventListener("keydown", async (e) => {
   if (e.code !== "Space") return;
   e.preventDefault();
-  userHasInteracted = true;
   try{
     await initAudio();
     await audio.ctx.resume();
     if (!audio.started) {
-      visualizerHasData = false;
-      if (!visualizerHasData) {
-        showLoadingIndicator();
-      }
       await play();
       applyMix();
-      updatePlayButton();
       return;
     }
-    if (audio.playing) {
-      await pause();
-    } else {
-      visualizerHasData = false; // Reset when starting to play
-      if (userHasInteracted) {
-        showLoadingIndicator();
-      }
-      await play();
-    }
-    updatePlayButton();
-  } catch {
-    hideLoadingIndicator();
-    updatePlayButton();
-  }
+    if (audio.playing) await pause();
+    else await play();
+  } catch {}
 }, { passive:false });
 
 function bothRight(){
-  return (tone >= 0.999) && beatOn;
+  return (tone >= 0.999) && (blend >= 0.999);
 }
 
 let lastBothRight = false;
@@ -2983,92 +1094,52 @@ function checkReward(){
   const nowBoth = bothRight();
   if (nowBoth && !lastBothRight) {
     runRewardWave();
+
+    // also give a bright burst at the right side (visual reward)
+    const r = panelEl.getBoundingClientRect();
+    // right-ish, mid-ish
+    panelFx.extravagantBurst(r.width + 40, r.height * 0.55, 1.0);
   }
   lastBothRight = nowBoth;
 }
 
-/* =========================
-   COMPLETION BURST TRACKING
-========================= */
-
-let completionBurstState = {
-  toneMet: false,
-  toneMetTime: 0,
-  lastTriggerTime: 0
-};
-
-const COMPLETION_THRESHOLD = 0.985;
-const COMPLETION_HOLD_TIME = 150; // ms
-const COMPLETION_RESET_THRESHOLD = 0.97;
-
-function checkCompletionBurst() {
-  // Only check if top slider exists
-  if (!sliderTone) return;
-  
-  const now = performance.now();
-  // Use display values for continuous checking during dragging (read-only)
-  const toneDisplay = sliderTone.getDisplayValue();
-  const toneMet = toneDisplay >= COMPLETION_THRESHOLD;
-  const beatMet = beatOn;
-  
-  // Track when each slider reaches threshold
-  if (toneMet && !completionBurstState.toneMet) {
-    completionBurstState.toneMet = true;
-    completionBurstState.toneMetTime = now;
-  } else if (!toneMet) {
-    completionBurstState.toneMet = false;
-    completionBurstState.toneMetTime = 0;
-  }
-  
-  // Check if both controls are in completion state for required duration
-  const bothMetForDuration = 
-    completionBurstState.toneMet && 
-    beatMet &&
-    completionBurstState.toneMetTime > 0 &&
-    (now - completionBurstState.toneMetTime) >= COMPLETION_HOLD_TIME;
-  
-  // Reset tracking if sliders drop below reset threshold (allows retrigger)
-  if (toneDisplay < COMPLETION_RESET_THRESHOLD || !beatOn) {
-    completionBurstState.toneMet = false;
-    completionBurstState.toneMetTime = 0;
-  }
-  
-  // Trigger if conditions met (subtle lock-in pulse)
-  const timeSinceLastTrigger = now - completionBurstState.lastTriggerTime;
-  if (bothMetForDuration && timeSinceLastTrigger > 240) {
-    panelFx.triggerCompletionBurst();
-    completionBurstState.lastTriggerTime = now;
-  }
-  
-  // Keep frame lit while both sliders are on the right side
-  if (bothMetForDuration) {
-    // Re-trigger softly at a lower rate
-    if (timeSinceLastTrigger > 1200) {
-      panelFx.triggerCompletionBurst();
-      completionBurstState.lastTriggerTime = now;
-    }
-  } else {
-    // Reset tracking when sliders move away
-    completionBurstState.toneMetTime = 0;
-  }
-}
-
 function slingshotFX({ strength, dir, wrap }){
-  // Rainbow sweep effect removed
-  // Function kept for compatibility but does nothing
+  const wr = wrap.getBoundingClientRect();
+  // y position relative to panelFx canvas
+  const pr = panelEl.getBoundingClientRect();
+  const y = (wr.top - pr.top) + (wr.height / 2) + 40; // + inset offset
+  panelFx.startRainbowSweep(y, dir, strength);
 }
 
-function slingshotLandFX({ strength, dest, wrap, pullDistance, knob }){
-  // Only create explosion if slingshot is at full speed
-  if (strength < 0.95) return; // Skip explosion for slower slingshots
-  
+function slingshotLandFX({ strength, dest, wrap }){
   const wr = wrap.getBoundingClientRect();
   const pr = panelEl.getBoundingClientRect();
   const x = (wr.left - pr.left) + (dest === 1 ? wr.width : 0) + 40;
   const y = (wr.top - pr.top) + (wr.height / 2) + 40;
-  // Pass track width and pull distance so particles can match slingshot speed
-  const trackWidth = wr.width;
-  panelFx.extravagantBurst(x, y, strength, trackWidth, pullDistance, knob);
+  panelFx.extravagantBurst(x, y, strength);
+}
+
+function eggPullAllowed(){
+  // ONLY when both sliders right
+  return bothRight();
+}
+
+function eggFire({ wrap, knob }){
+  // "slingshot upwards into the top of the screen" + raining white dots + coupon popup
+  // animate knob upward (visual only), then restore
+  knob.style.transition = "transform 420ms cubic-bezier(.2,1.2,.2,1), top 420ms cubic-bezier(.2,1.2,.2,1)";
+  knob.style.transform = "translate(-50%, -50%) scale(1.0) translateY(-340px)";
+  setTimeout(() => {
+    knob.style.transition = "";
+    knob.style.transform = "translate(-50%, -50%)";
+  }, 460);
+
+  // Start rain + big burst at top
+  panelFx.startRain();
+  const pr = panelEl.getBoundingClientRect();
+  panelFx.extravagantBurst(pr.width * 0.5 + 40, 20, 1.0);
+
+  showCoupon();
 }
 
 const sliderTone = makeSlider({
@@ -3076,7 +1147,7 @@ const sliderTone = makeSlider({
   knob: document.getElementById("knobTone"),
   glow: document.getElementById("glowTone"),
   initial: 0,
-  snapDist: 0.20, // Twice as big - doubled snap distance
+  snapDist: 0.10,
   onFirstInteract,
   onSlingshot: slingshotFX,
   onSlingshotLand: slingshotLandFX,
@@ -3087,1163 +1158,36 @@ const sliderTone = makeSlider({
   }
 });
 
-const beatToggleBtn = document.getElementById("beatToggle");
+const sliderBlend = makeSlider({
+  wrap: document.getElementById("wrapBlend"),
+  knob: document.getElementById("knobBlend"),
+  glow: document.getElementById("glowBlend"),
+  initial: 0,
+  snapDist: 0.10,
+  onFirstInteract,
+  onSlingshot: slingshotFX,
+  onSlingshotLand: slingshotLandFX,
 
-function updateBeatToggleUI() {
-  if (!beatToggleBtn) return;
-  beatToggleBtn.classList.toggle("is-on", beatOn);
-  beatToggleBtn.setAttribute("aria-checked", beatOn ? "true" : "false");
-}
+  verticalEgg: true,
+  canEggPull: eggPullAllowed,
+  onEggFire: eggFire,
 
-function setBeatState(nextValue, fromUser = false) {
-  beatOn = !!nextValue;
-  updateBeatToggleUI();
-  if (fromUser) {
-    userHasInteracted = true;
-    onFirstInteract();
+  onChange: (v) => {
+    blend = v;
+    if (audio.started) applyMix();
+    checkReward();
   }
-  if (audio.started) {
-    applyMix();
-  }
-  checkReward();
-}
-
-if (beatToggleBtn) {
-  beatToggleBtn.addEventListener("click", () => {
-    setBeatState(!beatOn, true);
-  }, { passive: true });
-}
-
-tone = sliderTone.value;
-setBeatState(true, false);
-setupGenreSelector();
-
-function setupGenreSelector() {
-  const wrap = document.getElementById("genreWrap");
-  const rail = document.getElementById("genreRail");
-  const knob = document.getElementById("genreKnob");
-  const labels = document.getElementById("genreLabels");
-  const title = document.getElementById("genreTitle");
-  if (!wrap || !rail || !knob || !labels || !title) return;
-  labels.innerHTML = "";
-  activeGenres.forEach((genre, idx) => {
-    const label = document.createElement("div");
-    label.className = "genreLabel" + (idx === currentGenreIndex ? " active" : "");
-    label.setAttribute("role", "button");
-    label.setAttribute("aria-label", `Select ${genre.label}`);
-    label.setAttribute("title", genre.label);
-    label.addEventListener("click", async () => {
-      if (triggerFirstGenreAutoplay(idx)) return;
-      await requestGenreChange(idx);
-      renderGenreSelector();
-    });
-    labels.appendChild(label);
-  });
-
-  let previewIndex = currentGenreIndex;
-  let lastCommittedGenreIndex = currentGenreIndex;
-  let genreFxTimeout = null;
-  let genreFirstAutoplayInFlight = false;
-  const triggerGenreChangeFx = () => {
-    wrap.classList.remove("genre-changing");
-    if (genreFxTimeout) clearTimeout(genreFxTimeout);
-    // Restart animation reliably on every committed genre change
-    void wrap.offsetWidth;
-    wrap.classList.add("genre-changing");
-    genreFxTimeout = setTimeout(() => {
-      wrap.classList.remove("genre-changing");
-      genreFxTimeout = null;
-    }, 280);
-  };
-  const triggerFirstGenreAutoplay = (idx) => {
-    if (firstGestureDone || genreFirstAutoplayInFlight) return false;
-    genreFirstAutoplayInFlight = true;
-    userHasInteracted = true;
-    requestGenreChange(idx)
-      .then(() => {
-        renderGenreSelector();
-        return onFirstInteract();
-      })
-      .then(() => {
-        renderGenreSelector();
-      })
-      .catch((err) => {
-        console.warn("First genre autoplay failed:", err);
-      })
-      .finally(() => {
-        genreFirstAutoplayInFlight = false;
-      });
-    return true;
-  };
-  const getGenreEndInsetPx = () => {
-    // Place knob center exactly at each rounded rail end-cap center.
-    const rect = rail.getBoundingClientRect();
-    if (rect && rect.height > 0) {
-      return rect.height * 0.5;
-    }
-    return 21; // fallback for 42px rail height
-  };
-
-  const renderGenreSelector = (renderIndex = currentGenreIndex) => {
-    const count = Math.max(1, activeGenres.length - 1);
-    const ratio = renderIndex / count;
-    const insetPx = getGenreEndInsetPx();
-    labels.style.paddingLeft = `${insetPx}px`;
-    labels.style.paddingRight = `${insetPx}px`;
-    knob.style.left = `calc(${insetPx}px + (${ratio} * (100% - ${insetPx * 2}px)))`;
-    if (renderIndex === currentGenreIndex && currentGenreIndex !== lastCommittedGenreIndex) {
-      triggerGenreChangeFx();
-      lastCommittedGenreIndex = currentGenreIndex;
-    }
-    if (renderIndex === currentGenreIndex) {
-      lastRequestedIndex = currentGenreIndex;
-    }
-    title.textContent = (activeGenres[currentGenreIndex]?.label || "").toUpperCase();
-    labels.querySelectorAll(".genreLabel").forEach((el, i) => {
-      el.classList.toggle("active", i === renderIndex);
-    });
-  };
-
-  let dragging = false;
-  let lastRequestedIndex = currentGenreIndex;
-  const getIndexFromEvent = (clientX) => {
-    const rect = rail.getBoundingClientRect();
-    const insetPx = getGenreEndInsetPx();
-    const minX = insetPx;
-    const maxX = Math.max(insetPx, rect.width - insetPx);
-    const x = Math.max(minX, Math.min(maxX, clientX - rect.left));
-    const ratio = rect.width > insetPx * 2 ? (x - insetPx) / (rect.width - insetPx * 2) : 0;
-    return Math.round(ratio * (activeGenres.length - 1));
-  };
-
-  const start = (e) => {
-    dragging = true;
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    previewIndex = getIndexFromEvent(x);
-    renderGenreSelector(previewIndex);
-    if (previewIndex !== lastRequestedIndex) {
-      lastRequestedIndex = previewIndex;
-      if (triggerFirstGenreAutoplay(previewIndex)) return;
-      requestGenreChange(previewIndex).then(renderGenreSelector);
-    }
-  };
-  const move = (e) => {
-    if (!dragging) return;
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    previewIndex = getIndexFromEvent(x);
-    renderGenreSelector(previewIndex);
-    if (previewIndex !== lastRequestedIndex) {
-      lastRequestedIndex = previewIndex;
-      if (triggerFirstGenreAutoplay(previewIndex)) return;
-      requestGenreChange(previewIndex).then(renderGenreSelector);
-    }
-  };
-  const end = async () => {
-    if (!dragging) return;
-    dragging = false;
-    renderGenreSelector();
-  };
-  rail.addEventListener("pointerdown", start, { passive: true });
-  window.addEventListener("pointermove", move, { passive: true });
-  window.addEventListener("pointerup", end, { passive: true });
-  rail.addEventListener("touchstart", start, { passive: true });
-  rail.addEventListener("touchmove", move, { passive: true });
-  rail.addEventListener("touchend", end, { passive: true });
-  window.addEventListener("resize", () => renderGenreSelector(), { passive: true });
-  renderGenreSelector();
-}
-
-// Continuous check for completion burst (runs every frame after sliders are created)
-function completionBurstLoop() {
-  checkCompletionBurst();
-  requestAnimationFrame(completionBurstLoop);
-}
-requestAnimationFrame(completionBurstLoop);
-
-/* =========================
-   3D SPECTROGRAM VISUALIZER
-========================= */
-
-// Initialize 3D spectrogram after sliders are ready
-setTimeout(() => {
-  // Check if Three.js is loaded
-  if (typeof THREE === 'undefined') {
-    console.error('Three.js not loaded! Check CDN.');
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = 'color: red; padding: 20px; text-align: center;';
-    errorDiv.textContent = 'Three.js failed to load. Check console.';
-    const container = document.getElementById('viz3d');
-    if (container) container.appendChild(errorDiv);
-    return;
-  }
-  
-  const viz3dContainer = document.getElementById('viz3d');
-  if (!viz3dContainer) {
-    console.error('Viz3d container not found!');
-    return;
-  }
-  
-  // Get the vizWrap container (parent of viz3d)
-  const vizWrap = viz3dContainer.parentElement;
-  const panelEl = document.getElementById('panel');
-  
-  console.log('Initializing 3D spectrogram, container size:', viz3dContainer.clientWidth, 'x', viz3dContainer.clientHeight);
-  
-  // Step 1: Create Three.js scene, camera, renderer
-  const scene = new THREE.Scene();
-  scene.background = null; // Transparent background
-  
-  // Use actual container dimensions - will be updated by ResizeObserver
-  const width = Math.max(viz3dContainer.clientWidth || 400, 1);
-  const height = Math.max(viz3dContainer.clientHeight || 300, 1);
-  
-  // Increased FOV to 75 degrees and adjusted near/far planes to prevent clipping when rotating
-  const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 2000);
-  
-  // Fixed camera (no camera angles UI). Visualizer never moves via user drag.
-  const targetCameraPos = new THREE.Vector3(59.4, 29.7, 0);
-  const currentCameraPos = new THREE.Vector3().copy(targetCameraPos);
-  const targetLookAt = new THREE.Vector3(0, 0, 0);
-  const currentLookAt = new THREE.Vector3().copy(targetLookAt);
-  
-  camera.position.copy(currentCameraPos);
-  camera.lookAt(currentLookAt);
-  
-  const renderer = new THREE.WebGLRenderer({ 
-    antialias: true, 
-    alpha: true,
-    premultipliedAlpha: false, // Important for proper transparency
-    preserveDrawingBuffer: false,
-    powerPreference: "high-performance"
-  });
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  renderer.setPixelRatio(dpr);
-  renderer.setSize(width, height);
-  renderer.setClearColor(0x000000, 0); // Fully transparent background
-  renderer.domElement.style.width = '100%';
-  renderer.domElement.style.height = '100%';
-  renderer.domElement.style.display = 'block';
-  renderer.domElement.style.backgroundColor = 'transparent';
-  viz3dContainer.appendChild(renderer.domElement);
-  
-  console.log('Renderer created, canvas added to container');
-  
-  // Set up ResizeObserver on viz3dContainer to update renderer when container size changes
-  // This ensures the 3D view uses the actual viz3dContainer size, not window size
-  const updateRendererSize = () => {
-    const rect = viz3dContainer.getBoundingClientRect();
-    const newWidth = Math.max(1, Math.floor(rect.width));
-    const newHeight = Math.max(1, Math.floor(rect.height));
-    
-    // Update renderer size to match container exactly
-    renderer.setSize(newWidth, newHeight, false);
-    camera.aspect = newWidth / newHeight;
-    camera.updateProjectionMatrix();
-    
-    // Ensure renderer viewport matches container bounds
-    renderer.setViewport(0, 0, newWidth, newHeight);
-  };
-  
-  // Observe viz3dContainer for size changes
-  const containerResizeObserver = new ResizeObserver(() => {
-    updateRendererSize();
-  });
-  containerResizeObserver.observe(viz3dContainer);
-  
-  // Also sync visualizer width with panel width dynamically
-  if (panelEl) {
-    const MIN_WIDTH = 300; // Minimum visualizer width in pixels
-    const MAX_WIDTH = 1425; // Maximum visualizer width in pixels
-    
-    const syncVisualizerWidth = () => {
-      const panelRect = panelEl.getBoundingClientRect();
-      const panelWidth = panelRect.width;
-      
-      // Match panel width with current scale factor, then clamp to min/max
-      const targetWidth = panelWidth * 1.1875;
-      const clampedWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, targetWidth));
-      viz3dContainer.style.width = clampedWidth + 'px';
-      
-      // Update renderer size after width change
-      updateRendererSize();
-    };
-    
-    // Watch panel for width changes
-    const panelResizeObserver = new ResizeObserver(() => {
-      syncVisualizerWidth();
-    });
-    panelResizeObserver.observe(panelEl);
-    
-    // Initial sync
-    setTimeout(syncVisualizerWidth, 150);
-  }
-  
-  // Handle orientation changes
-  window.addEventListener('orientationchange', () => {
-    setTimeout(() => {
-      updateRendererSize();
-    }, 250);
-  });
-  
-  // No OrbitControls - visualizer is not draggable. Camera only changes via 1/2/3 buttons.
-  renderer.domElement.style.pointerEvents = 'none';
-  renderer.domElement.setAttribute('aria-hidden', 'true');
-  
-  // Overlay on top of canvas so touches scroll the parent page
-  const scrollPass = document.createElement('div');
-  scrollPass.className = 'viz3d-scroll-pass';
-  scrollPass.setAttribute('aria-hidden', 'true');
-  viz3dContainer.appendChild(scrollPass);
-  
-  // Step 3: Spectrogram parameters - High frequency detail, square shape
-  const freqBins = 256; // Much higher frequency resolution for fine detail (was 96)
-  const historyLength = 80; // Time history (Z axis)
-  // Make it square: width = depth
-  // Width: (256-1) * gridSpacingX, Depth: (80-1) * gridSpacingZ
-  // To make square: gridSpacingZ = (255 * gridSpacingX) / 79
-  const gridSpacingX = 0.186; // Frequency axis spacing
-  const gridSpacingZ = (255 * gridSpacingX) / 79; // Time axis spacing to make square
-  const maxHeight = 15;
-  
-  // Step 4: Create rolling history buffer
-  const historyBuffer = [];
-  for (let i = 0; i < historyLength; i++) {
-    historyBuffer.push(new Float32Array(freqBins).fill(0));
-  }
-  
-  // Smoothing for audio data - reduced for more detail/granularity
-  const smoothedData = new Float32Array(freqBins).fill(0);
-  function smooth(prev, next, attack = 0.2, release = 0.05) {
-    // Less aggressive smoothing to preserve fine detail and spikes
-    const a = next > prev ? attack : release;
-    return prev + (next - prev) * a;
-  }
-  
-  // Step 5: Create terrain geometry (square shape)
-  const geometry = new THREE.PlaneGeometry(
-    (freqBins - 1) * gridSpacingX,
-    (historyLength - 1) * gridSpacingZ,
-    freqBins - 1,
-    historyLength - 1
-  );
-  
-  // Rotate to lay flat (X-Z plane, Y up)
-  geometry.rotateX(-Math.PI / 2);
-  
-  // Initialize vertex colors to black (no audio state)
-  const colors = [];
-  const vertexCount = geometry.attributes.position.count;
-  for (let i = 0; i < vertexCount; i++) {
-    colors.push(0, 0, 0); // Start black when no audio
-  }
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-  // Theme helpers (no transition; immediate genre color changes).
-  const themeMixOut = { r: 0, g: 0, b: 0 };
-
-  function clamp01(v) {
-    return Math.max(0, Math.min(1, v));
-  }
-
-  function hexToRgb01(hex) {
-    const clean = String(hex || "").replace("#", "");
-    if (clean.length !== 6) return { r: 1, g: 0.3, b: 0.6 };
-    return {
-      r: parseInt(clean.substring(0, 2), 16) / 255,
-      g: parseInt(clean.substring(2, 4), 16) / 255,
-      b: parseInt(clean.substring(4, 6), 16) / 255,
-    };
-  }
-
-  function getThemePair(theme) {
-    const colors = theme?.colors || [];
-    return {
-      a: hexToRgb01(colors[0] || "#ff4aa2"),
-      b: hexToRgb01(colors[1] || "#ff8a00"),
-    };
-  }
-
-  function applyDuotoneTheme(baseColor, themePair, energy, rawMix, vocalBeat, outColor) {
-    outColor.r = baseColor.r;
-    outColor.g = baseColor.g;
-    outColor.b = baseColor.b;
-
-    // True 2-color gradient per genre.
-    const gradientT = clamp01(energy * 0.88 + rawMix * 0.12);
-    const gradR = themePair.a.r + (themePair.b.r - themePair.a.r) * gradientT;
-    const gradG = themePair.a.g + (themePair.b.g - themePair.a.g) * gradientT;
-    const gradB = themePair.a.b + (themePair.b.b - themePair.a.b) * gradientT;
-
-    // Color intensity is driven ONLY by the top UNMIXED↔MIXED slider.
-    // Beat toggle should not push grey->color intensity.
-    const colorDrive = rawMix;
-    const amt = clamp01(0.08 + colorDrive * 0.86);
-
-    outColor.r = outColor.r * (1 - amt) + gradR * amt;
-    outColor.g = outColor.g * (1 - amt) + gradG * amt;
-    outColor.b = outColor.b * (1 - amt) + gradB * amt;
-
-    const chromaBoost = 1.02 + colorDrive * 0.74;
-    const maxCh = Math.max(outColor.r, outColor.g, outColor.b);
-    const minCh = Math.min(outColor.r, outColor.g, outColor.b);
-    const mid = (maxCh + minCh) * 0.5;
-    outColor.r = clamp01((outColor.r - mid) * chromaBoost + mid);
-    outColor.g = clamp01((outColor.g - mid) * chromaBoost + mid);
-    outColor.b = clamp01((outColor.b - mid) * chromaBoost + mid);
-
-    // Final desaturation gate tied only to top slider for clear grey->color progression.
-    const mono = (outColor.r + outColor.g + outColor.b) / 3;
-    outColor.r = mono * (1 - colorDrive) + outColor.r * colorDrive;
-    outColor.g = mono * (1 - colorDrive) + outColor.g * colorDrive;
-    outColor.b = mono * (1 - colorDrive) + outColor.b * colorDrive;
-    return outColor;
-  }
-
-  // Step 6: Color palette function with smooth fading between states
-  // RAW + VOCALS (both low) = Grey
-  // BEAT only (RAW + BEAT) = Orange and Yellow
-  // MIXED + VOCALS = Pink and Purple
-  // MIXED + BEAT (both high) = First version colors (purple → red → orange → yellow)
-  // Optimized: return {r,g,b} object instead of THREE.Color to avoid allocations
-  function getSpectrogramColor(energy, rawMix, vocalBeat, outColor = {r: 0, g: 0, b: 0}) {
-    energy = Math.max(0, Math.min(1, energy));
-    
-    // If no energy (no audio), return black
-    if (energy === 0) {
-      outColor.r = 0;
-      outColor.g = 0;
-      outColor.b = 0;
-      return outColor;
-    }
-    
-    // Base gloom level
-    const gray = energy * 0.3;
-    
-    // Helper function to get color for a specific state
-    function getStateColor(state, e) {
-      let r = 0, g = 0, b = 0;
-      
-      if (state === 'rawVocals') {
-        // RAW + VOCALS = Grey
-        return { r: gray, g: gray, b: gray };
-      } else if (state === 'rawBeat') {
-        // RAW + BEAT = Orange and Yellow
-        if (e < 0.5) {
-          const t = e / 0.5;
-          r = 0.8 + t * 0.2;
-          g = 0.3 + t * 0.3;
-          b = 0.0;
-        } else {
-          const t = (e - 0.5) / 0.5;
-          r = 1.0;
-          g = 0.6 + t * 0.4;
-          b = 0.0 + t * 0.2;
-        }
-      } else if (state === 'mixedVocals') {
-        // MIXED + VOCALS = Pink and Purple
-        if (e < 0.33) {
-          const t = e / 0.33;
-          r = 0.5 + t * 0.2;
-          g = 0.0;
-          b = 0.5 + t * 0.3;
-        } else if (e < 0.66) {
-          const t = (e - 0.33) / 0.33;
-          r = 0.7 + t * 0.3;
-          g = 0.0 + t * 0.2;
-          b = 0.8 - t * 0.4;
-        } else {
-          const t = (e - 0.66) / 0.34;
-          r = 1.0;
-          g = 0.2 + t * 0.3;
-          b = 0.4 - t * 0.2;
-        }
-      } else if (state === 'mixedBeat') {
-        // MIXED + BEAT = First version colors
-        if (e < 0.33) {
-          const t = e / 0.33;
-          r = 0.5 + t * 0.5;
-          g = 0.0 + t * 0.0;
-          b = 0.5 + t * 0.0;
-        } else if (e < 0.66) {
-          const t = (e - 0.33) / 0.33;
-          r = 1.0;
-          g = 0.0 + t * 0.5;
-          b = 0.0;
-        } else {
-          const t = (e - 0.66) / 0.34;
-          r = 1.0;
-          g = 0.5 + t * 0.5;
-          b = 0.0 + t * 0.3;
-        }
-      }
-      return { r, g, b };
-    }
-    
-    // Calculate blend factors for smooth transitions
-    // rawMix: 0 = RAW, 1 = MIXED
-    // vocalBeat: 0 = VOCALS, 1 = BEAT
-    
-    // Interpolate between RAW and MIXED
-    const rawFactor = 1 - rawMix;
-    const mixedFactor = rawMix;
-    
-    // Interpolate between VOCALS and BEAT
-    const vocalsFactor = 1 - vocalBeat;
-    const beatFactor = vocalBeat;
-    
-    // Get colors for all four corner states
-    const rawVocalsColor = getStateColor('rawVocals', energy);
-    const rawBeatColor = getStateColor('rawBeat', energy);
-    const mixedVocalsColor = getStateColor('mixedVocals', energy);
-    const mixedBeatColor = getStateColor('mixedBeat', energy);
-    
-    // First blend along the RAW→MIXED axis
-    const vocalsBlend = {
-      r: rawVocalsColor.r * rawFactor + mixedVocalsColor.r * mixedFactor,
-      g: rawVocalsColor.g * rawFactor + mixedVocalsColor.g * mixedFactor,
-      b: rawVocalsColor.b * rawFactor + mixedVocalsColor.b * mixedFactor
-    };
-    
-    const beatBlend = {
-      r: rawBeatColor.r * rawFactor + mixedBeatColor.r * mixedFactor,
-      g: rawBeatColor.g * rawFactor + mixedBeatColor.g * mixedFactor,
-      b: rawBeatColor.b * rawFactor + mixedBeatColor.b * mixedFactor
-    };
-    
-    // Then blend along the VOCALS→BEAT axis
-    const finalColor = {
-      r: vocalsBlend.r * vocalsFactor + beatBlend.r * beatFactor,
-      g: vocalsBlend.g * vocalsFactor + beatBlend.g * beatFactor,
-      b: vocalsBlend.b * vocalsFactor + beatBlend.b * beatFactor
-    };
-    
-    // Apply intensity based on overall slider activity
-    const effectiveWeight = Math.max(rawMix, vocalBeat);
-    
-    if (effectiveWeight < 0.05) {
-      outColor.r = gray;
-      outColor.g = gray;
-      outColor.b = gray;
-      return outColor;
-    }
-    
-    // Smooth color application
-    const litFactor = Math.min(1, effectiveWeight / 0.5);
-    outColor.r = gray + (finalColor.r - gray) * litFactor;
-    outColor.g = gray + (finalColor.g - gray) * litFactor;
-    outColor.b = gray + (finalColor.b - gray) * litFactor;
-
-    const themePair = getThemePair(activeGenres[currentGenreIndex]?.theme);
-    applyDuotoneTheme(outColor, themePair, energy, rawMix, vocalBeat, themeMixOut);
-    outColor.r = themeMixOut.r;
-    outColor.g = themeMixOut.g;
-    outColor.b = themeMixOut.b;
-    
-    return outColor;
-  }
-  
-  // Step 7: Create material with vertex colors
-  const material = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    side: THREE.DoubleSide,
-    emissive: 0x000000,
-    emissiveIntensity: 0.5,
-    metalness: 0.3,
-    roughness: 0.7
-  });
-  
-  // Step 5: Store original emissive intensity for glow pulse
-  const originalEmissiveIntensity = 0.5;
-  
-  const terrain = new THREE.Mesh(geometry, material);
-  scene.add(terrain);
-  
-  // Add lighting
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
-  
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-  directionalLight.position.set(20, 30, 20);
-  scene.add(directionalLight);
-  
-  // Slider impulse tracking
-  let sliderImpulse = 0;
-  let lastMixAmount = mixAmount();
-  
-  // Step 4: Reward effect state
-  let rewardActive = false;
-  let rewardEligible = true;
-  let rewardStartTime = 0;
-  const REWARD_THRESHOLD = 0.98;
-  const REWARD_RESET_THRESHOLD = 0.95;
-  const REWARD_DURATION = 700; // ms
-  
-  // Step 5: Camera zoom state for reward
-  let originalCameraDistance = 0;
-  let rewardCameraZoom = 0;
-  
-  // Step 0: Single source of truth for slider values (normalized 0..1)
-  function getRawMix() {
-    // RAW (0) → MIXED (1)
-    return Math.max(0, Math.min(1, tone));
-  }
-  
-  function getVocalBeat() {
-    // Binary beat control: OFF (0) or ON (1)
-    return beatOn ? 1 : 0;
-  }
-  
-  // Step 4: Check and trigger reward effect
-  function checkRewardEffect(rawMix, vocalBeat, now) {
-    if (rawMix > REWARD_THRESHOLD && vocalBeat > REWARD_THRESHOLD) {
-      if (rewardEligible && !rewardActive) {
-        // Trigger reward
-        rewardActive = true;
-        rewardEligible = false;
-        rewardStartTime = now;
-        
-        // Step 5: Store original camera distance for zoom effect
-        if (originalCameraDistance === 0) {
-          originalCameraDistance = currentCameraPos.distanceTo(new THREE.Vector3(0, 0, 0));
-        }
-      }
-    } else if (rawMix < REWARD_RESET_THRESHOLD || vocalBeat < REWARD_RESET_THRESHOLD) {
-      // Reset eligibility when sliders drop below reset threshold
-      rewardEligible = true;
-    }
-    
-    // Check if reward duration has elapsed
-    if (rewardActive && (now - rewardStartTime) > REWARD_DURATION) {
-      rewardActive = false;
-      rewardCameraZoom = 0;
-    }
-    
-    return rewardActive;
-  }
-  
-  // Step 5: Apply camera zoom during reward
-  function applyRewardCameraZoom(isRewardActive, now) {
-    if (!isRewardActive) {
-      rewardCameraZoom = 0;
-      return;
-    }
-    
-    const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
-    const zoomDuration = 0.25; // 250ms zoom in/out
-    
-    if (rewardProgress < zoomDuration) {
-      // Zoom in (ease in)
-      const t = rewardProgress / zoomDuration;
-      const easeIn = t * t; // Quadratic ease in
-      rewardCameraZoom = easeIn * 0.055; // subtler zoom
-    } else if (rewardProgress < zoomDuration * 2) {
-      // Hold zoomed briefly
-      rewardCameraZoom = 0.055;
-    } else if (rewardProgress < zoomDuration * 3) {
-      // Zoom out (ease out)
-      const t = (rewardProgress - zoomDuration * 2) / zoomDuration;
-      const easeOut = 1 - (1 - t) * (1 - t); // Quadratic ease out
-      rewardCameraZoom = 0.055 * (1 - easeOut);
-    } else {
-      rewardCameraZoom = 0;
-    }
-  }
-  
-  // Step 4: Get reward color (golden/white flash instead of rainbow)
-  // Optimized: reuse color object to avoid allocations
-  const rewardColorObj = {r: 0, g: 0, b: 0};
-  function getRewardColor(t, outColor = rewardColorObj) {
-    // t: 0..1 across the sweep
-    // Golden to white flash
-    const intensity = Math.sin(t * Math.PI);
-    outColor.r = 1.0;
-    outColor.g = 0.8 + intensity * 0.2; // 0.8 to 1.0
-    outColor.b = 0.3 + intensity * 0.7; // 0.3 to 1.0
-    return outColor;
-  }
-  
-  function mixAmount() {
-    // Legacy helper for visualizer impulse weighting with binary beat state.
-    const rawMix = getRawMix();
-    const vocalBeat = getVocalBeat();
-    return Math.max(0, Math.min(1, rawMix * 0.75 + vocalBeat * 0.25));
-  }
-  
-  function updateImpulse() {
-    sliderImpulse *= 0.92;
-    if (sliderImpulse < 0.001) sliderImpulse = 0;
-  }
-  
-  // Step 8: Update terrain with audio data
-  function updateTerrain() {
-    // Get slider values (single source of truth) - always available
-    const rawMix = getRawMix();
-    const vocalBeat = getVocalBeat();
-    const now = performance.now();
-    
-    // If audio isn't ready yet, set everything to black (no audio)
-    if (!audio.analyser || !audio.dataArray || !audio.ctx) {
-      // Update colors only (no geometry changes) - set to black when no audio
-      const positions = geometry.attributes.position;
-      const colors = geometry.attributes.color;
-      
-      for (let z = 0; z < historyLength; z++) {
-        for (let x = 0; x < freqBins; x++) {
-          const vertexIndex = z * freqBins + x;
-          
-          // Ensure vertex stays at Y=0 (flat) - no geometry movement before audio starts
-          positions.setY(vertexIndex, 0);
-          
-          // Set to black when no audio is playing
-          colors.setXYZ(vertexIndex, 0, 0, 0);
-        }
-      }
-      colors.needsUpdate = true;
-      positions.needsUpdate = true;
-      geometry.computeVertexNormals();
-      return;
-    }
-    
-    // Step 4: Check for reward effect
-    const isRewardActive = checkRewardEffect(rawMix, vocalBeat, now);
-    
-    // Step 5: Apply camera zoom during reward
-    applyRewardCameraZoom(isRewardActive, now);
-    
-    // Step 5: Apply glow pulse to material during reward
-    if (isRewardActive) {
-      const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
-      const pulse = Math.sin(rewardProgress * Math.PI * 3) * 0.22 + 0.78;
-      material.emissiveIntensity = originalEmissiveIntensity * (1 + pulse * 0.16);
-    } else {
-      material.emissiveIntensity = originalEmissiveIntensity;
-    }
-    
-    // Get fresh frequency data
-    audio.analyser.getByteFrequencyData(audio.dataArray);
-    
-    // Smooth and normalize frequency data
-    const sampleRate = audio.ctx.sampleRate;
-    const fftSize = audio.analyser.fftSize;
-    const binHz = sampleRate / fftSize;
-    
-    // Use more of the FFT data for higher frequency resolution
-    // With 4096 FFT size, we get 2048 frequency bins
-    const availableBins = audio.dataArray.length;
-    
-    // Non-linear frequency mapping function based on image specs:
-    // EXPAND (low freq, left) -> EXPAND BUT A LITTLE LESS (mid freq, middle) -> SHRINK (high freq, right)
-    function mapVisualToFrequency(visualPos) {
-      // visualPos: 0 (left) to 1 (right) - position in visualizer
-      // Returns: frequency position 0 (low) to 1 (high) - which frequency to sample
-      
-      if (visualPos < 0.5) {
-        // EXPAND region (left half): Expand low frequencies
-        // Map first 50% of visual space to first ~25% of frequencies
-        const t = visualPos / 0.5; // 0 to 1 within left half
-        const expanded = t * t * 0.25; // Quadratic curve, expands low frequencies
-        return expanded;
-      } else if (visualPos < 0.8) {
-        // EXPAND BUT A LITTLE LESS region (middle 30%): Moderate expansion
-        // Map middle 30% of visual space to next ~35% of frequencies
-        const t = (visualPos - 0.5) / 0.3; // 0 to 1 within middle section
-        const expanded = 0.25 + (t * t * 0.35); // Quadratic but less aggressive
-        return expanded;
-      } else {
-        // SHRINK region (right 20%): Compress high frequencies
-        // Map last 20% of visual space to remaining ~40% of frequencies
-        const t = (visualPos - 0.8) / 0.2; // 0 to 1 within right section
-        const compressed = 0.6 + (t * 0.4); // Linear compression for high frequencies
-        return compressed;
-      }
-    }
-    
-    for (let i = 0; i < freqBins; i++) {
-      // Map visual position to frequency using non-linear distribution
-      const visualPos = i / freqBins; // Position in visualizer (0 to 1)
-      const freqPos = mapVisualToFrequency(visualPos); // Mapped frequency position (0 to 1)
-      
-      // Convert frequency position to actual Hz
-      const targetHz = freqPos * (sampleRate / 2);
-      const binIndex = Math.floor(targetHz / binHz);
-      const rawValue = audio.dataArray[Math.min(binIndex, availableBins - 1)] / 255;
-      
-      // Less smoothing for more detail - preserve spikes and fine variations
-      smoothedData[i] = smooth(smoothedData[i], rawValue, 0.2, 0.05);
-    }
-    
-    // Push new data into history buffer (shift left)
-    historyBuffer.pop();
-    historyBuffer.unshift(new Float32Array(smoothedData));
-    
-    // Update geometry positions and colors
-    const positions = geometry.attributes.position;
-    const colors = geometry.attributes.color;
-    const mixT = mixAmount(); // Keep for now, will refactor in next steps
-    
-    // Step 1: Add minimum brightness floor for RAW+VOCALS corner (gloom factor)
-    const gloomFactor = (1 - rawMix) * (1 - vocalBeat);
-    const minLuma = 0.06 + (0.18 - 0.06) * gloomFactor; // Lerp from 0.06 to 0.18 based on gloom
-    // Give more weight to RAW/MIXED slider for brightness/volume effect
-    const weightedMix = rawMix * 0.7 + vocalBeat * 0.3;
-    const baseBrightness = 0.3 + 0.7 * weightedMix + sliderImpulse * 0.5;
-    const brightness = Math.max(minLuma, baseBrightness);
-    
-    // Reusable color object to avoid allocations in tight loop
-    const color = {r: 0, g: 0, b: 0};
-    
-    for (let z = 0; z < historyLength; z++) {
-      const historyIndex = z;
-      const freqData = historyBuffer[historyIndex];
-      
-      for (let x = 0; x < freqBins; x++) {
-        const vertexIndex = z * freqBins + x;
-        const energy = freqData[x];
-        
-        // Step 2: Increase displacement amplitude for RAW+VOCALS to show more geometry detail
-        const rawVocalBoost = 0.8 * ((1 - rawMix) * (1 - vocalBeat));
-        const baseAmp = maxHeight * brightness;
-        const amp = baseAmp * (1 + rawVocalBoost);
-        
-        // Update Y position (height) with amplitude boost
-        positions.setY(vertexIndex, energy * amp);
-        
-        // Update color (Step 3: pass rawMix and vocalBeat for split control) - reuse color object
-        getSpectrogramColor(energy, rawMix, vocalBeat, color);
-        
-        // If energy is zero (no audio), keep it black and skip all color processing
-        if (energy === 0) {
-          colors.setXYZ(vertexIndex, 0, 0, 0);
-          continue; // Skip to next vertex
-        }
-        
-        // Step 4: Apply golden/white flash sweep during reward (no rainbow)
-        if (isRewardActive) {
-          const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
-          // Create sweep effect: golden flash moves across the mesh
-          // Use x position to create horizontal sweep
-          const sweepPos = (x / freqBins) + (rewardProgress * 1.2) - 0.1;
-          const sweepT = Math.max(0, Math.min(1, sweepPos));
-          const rewardColor = getRewardColor(sweepT); // Returns {r,g,b} object, no allocation
-          
-          // Blend between normal color and golden flash based on sweep position
-          const sweepIntensity = Math.exp(-Math.pow((sweepPos - 0.5) * 4.5, 2));
-          color.r = color.r * (1 - sweepIntensity * 0.32) + rewardColor.r * sweepIntensity * 0.32;
-          color.g = color.g * (1 - sweepIntensity * 0.32) + rewardColor.g * sweepIntensity * 0.32;
-          color.b = color.b * (1 - sweepIntensity * 0.32) + rewardColor.b * sweepIntensity * 0.32;
-        }
-        
-        // Step 1: Apply minimum brightness floor to prevent pure black
-        // Lift dark colors toward dark gray when in gloom mode
-        let finalR = color.r * brightness;
-        let finalG = color.g * brightness;
-        let finalB = color.b * brightness;
-        
-        // Step 4: Add bloom pulse during reward
-        if (isRewardActive) {
-          const rewardProgress = (now - rewardStartTime) / REWARD_DURATION;
-          const pulse = Math.sin(rewardProgress * Math.PI * 2) * 0.22 + 0.78;
-          finalR = Math.min(1, finalR * (1 + pulse * 0.1));
-          finalG = Math.min(1, finalG * (1 + pulse * 0.1));
-          finalB = Math.min(1, finalB * (1 + pulse * 0.1));
-        }
-        
-        // If the color is too dark, lift it toward the minimum luma
-        const currentLuma = 0.299 * finalR + 0.587 * finalG + 0.114 * finalB;
-        if (currentLuma < minLuma && gloomFactor > 0.1) {
-          const lift = (minLuma - currentLuma) * gloomFactor;
-          finalR = Math.min(1, finalR + lift);
-          finalG = Math.min(1, finalG + lift);
-          finalB = Math.min(1, finalB + lift);
-        }
-        
-        colors.setXYZ(vertexIndex, finalR, finalG, finalB);
-      }
-    }
-    
-    positions.needsUpdate = true;
-    colors.needsUpdate = true;
-    geometry.computeVertexNormals();
-  }
-  
-  // Step 9: Animation loop
-  function animate() {
-    requestAnimationFrame(animate);
-    
-    // Camera smoothly eases toward fixed target position
-    {
-      // Smoothly move camera toward target angle
-      currentCameraPos.lerp(targetCameraPos, 0.05); // Smooth lerp to target position
-      currentLookAt.lerp(targetLookAt, 0.05); // Smooth lerp to target look-at
-      
-      // Update camera
-      camera.position.copy(currentCameraPos);
-      camera.lookAt(currentLookAt);
-      
-      // Enforce minimum distance from center to prevent clipping
-      const distance = currentCameraPos.distanceTo(new THREE.Vector3(0, 0, 0));
-      const minDistance = 40;
-      
-      if (distance < minDistance) {
-        const direction = currentCameraPos.clone().normalize();
-        currentCameraPos.copy(direction.multiplyScalar(minDistance));
-        camera.position.copy(currentCameraPos);
-      }
-      
-      // Step 5: Apply reward camera zoom (move camera closer during reward)
-      if (rewardCameraZoom > 0 && originalCameraDistance > 0) {
-        const direction = currentCameraPos.clone().normalize();
-        const zoomedDistance = originalCameraDistance * (1 - rewardCameraZoom);
-        const safeZoomedDistance = Math.max(zoomedDistance, minDistance * 0.9);
-        const zoomedPos = direction.multiplyScalar(safeZoomedDistance);
-        camera.position.copy(zoomedPos);
-      }
-    }
-    
-    // Track slider changes for impulse
-    const currentMix = mixAmount();
-    const mixChange = Math.abs(currentMix - lastMixAmount);
-    if (mixChange > 0.001) {
-      sliderImpulse = Math.max(sliderImpulse, mixChange * 3.0);
-      lastMixAmount = currentMix;
-    }
-    
-    // Check if visualizer has data and hide loading indicator
-    if (userHasInteracted && !visualizerHasData) {
-      visualizerHasData = checkVisualizerData();
-      if (visualizerHasData) {
-        hideLoadingIndicator();
-      }
-    }
-    
-    updateImpulse();
-    updateTerrain();
-    // Ensure transparency is maintained each frame
-    renderer.setClearColor(0x000000, 0);
-    renderer.render(scene, camera);
-  }
-  
-  // Step 10: Handle resize - use ResizeObserver on vizWrap (handled above)
-  function handleResize() {
-    // ResizeObserver handles this automatically, but update if needed
-    if (vizWrap) {
-      const rect = vizWrap.getBoundingClientRect();
-      const newWidth = Math.max(1, Math.floor(rect.width));
-      const newHeight = Math.max(1, Math.floor(rect.height));
-      renderer.setSize(newWidth, newHeight, false);
-      camera.aspect = newWidth / newHeight;
-      camera.updateProjectionMatrix();
-    }
-    renderer.setClearColor(0x000000, 0);
-  }
-  
-  window.addEventListener('resize', handleResize);
-  
-  // Initial render to test
-  renderer.render(scene, camera);
-  console.log('Initial render complete');
-  
-  // Start animation
-  animate();
-  
-  console.log('3D Spectrogram visualizer initialized');
-}, 100); // Wait 100ms for DOM to be fully ready
-
-// Smart scroll handling: allow parent page vertical scroll, prevent horizontal scroll
-// Only intercept when detecting vertical scroll intent
-let isDraggingSlider = false;
-let touchStartY = 0;
-let touchStartX = 0;
-let touchStartTime = 0;
-let isVerticalScrollIntent = false;
-let scrollOverlay = null;
-
-// Initialize scroll overlay and start preloading audio
-document.addEventListener('DOMContentLoaded', () => {
-  scrollOverlay = document.getElementById('scrollOverlay');
-  // Start preloading all enabled genres immediately for faster switches.
-  preloadAllGenres();
 });
 
-// Check if target is an interactive element (slider, button, etc.)
-function isInteractiveElement(target) {
-  if (!target) return false;
-  
-  // Check if it's a slider element
-  const trackWrap = target.closest('.trackWrap');
-  if (trackWrap) return true;
-
-  // Genre selector rail/dots/title should remain interactive (no scroll overlay capture)
-  if (target.closest('#genreWrap') || target.closest('#genreRail') || target.closest('.genreLabel')) return true;
-  
-  // Check if it's a button
-  if (target.closest('button') || target.tagName === 'BUTTON') return true;
-  
-  // Check if it's the play button
-  if (target.id === 'btnPlay' || target.closest('#btnPlay')) return true;
-  
-  return false;
-}
-
-document.addEventListener("touchstart", (e) => {
-  const target = e.target;
-  
-  // Reset scroll intent detection
-  isVerticalScrollIntent = false;
-  
-  // If touching an interactive element (slider, button), do NOT allow scroll-through
-  if (isInteractiveElement(target)) {
-    if (scrollOverlay) scrollOverlay.classList.remove('active');
-    
-    // Track initial position for slider drag detection
-    if (panelEl && panelEl.contains(target)) {
-      const trackWrap = target.closest('.trackWrap');
-      if (trackWrap && e.touches.length > 0) {
-        touchStartY = e.touches[0].clientY;
-        touchStartX = e.touches[0].clientX;
-        touchStartTime = performance.now();
-        isDraggingSlider = false;
-      }
-    }
-    return;
-  }
-  
-  // Anywhere else on the iframe (visualizer, panel background, app area): allow vertical scroll to parent
-  // Activate overlay immediately so finger can scroll the page without scrolling the iframe
-  if (scrollOverlay) scrollOverlay.classList.add('active');
-  if (e.touches.length > 0) {
-    touchStartY = e.touches[0].clientY;
-    touchStartX = e.touches[0].clientX;
-    touchStartTime = performance.now();
-  }
-}, { passive: true });
+tone = sliderTone.value;
+blend = sliderBlend.value;
 
 document.addEventListener("touchmove", (e) => {
-  const target = e.target;
-  
-  // If user is interacting with slider/button, prevent scrolling
-  if (isInteractiveElement(target)) {
-    if (scrollOverlay) scrollOverlay.classList.remove('active');
-    
-    // Handle slider drag detection
-    if (panelEl && panelEl.contains(target)) {
-      const trackWrap = target.closest('.trackWrap');
-      if (trackWrap && e.touches.length > 0) {
-        const touch = e.touches[0];
-        const deltaY = Math.abs(touch.clientY - touchStartY);
-        const deltaX = Math.abs(touch.clientX - touchStartX);
-        
-        // If horizontal movement is greater than vertical, it's a slider drag
-        if (deltaX > 10 && deltaX > deltaY * 1.5) {
-          isDraggingSlider = true;
-          e.preventDefault(); // Prevent scroll during horizontal slider drag
-        } else if (isDraggingSlider && deltaX > 5) {
-          // Continue preventing scroll while dragging horizontally
-          e.preventDefault();
-        }
-        // For vertical movement or no clear direction, allow parent scroll (don't preventDefault)
-      }
-    }
-    return;
-  }
-  
-  // Visualizer/canvas: never capture touch - do NOT preventDefault so parent page can scroll
-  const vizWrapEl = target.closest('.vizWrap');
-  const viz3dEl = target.closest('.viz3d');
-  const onVisualizer = vizWrapEl || viz3dEl || target.tagName === 'CANVAS';
-  if (onVisualizer) {
-    if (scrollOverlay) scrollOverlay.classList.add('active');
-    // Never preventDefault on visualizer - scrolling must pass through
-    return;
-  }
-  
-  // Other non-interactive areas: only prevent horizontal so iframe never scrolls sideways
-  if (e.touches.length > 0 && touchStartY !== 0 && touchStartX !== 0) {
-    const touch = e.touches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartX);
-    const deltaY = Math.abs(touch.clientY - touchStartY);
-    if (deltaX > 15 && deltaX > deltaY * 1.5) {
-      e.preventDefault();
-    }
-  }
-}, { passive: false });
-
-document.addEventListener("touchend", (e) => {
-  // Reset states
-  isDraggingSlider = false;
-  isVerticalScrollIntent = false;
-  touchStartY = 0;
-  touchStartX = 0;
-  touchStartTime = 0;
-  
-  // Deactivate overlay after a short delay (allows final scroll momentum)
-  if (scrollOverlay) {
-    setTimeout(() => {
-      scrollOverlay.classList.remove('active');
-    }, 100);
-  }
-}, { passive: true });
-
-// Wheel: never block normal scrolling; always prefer parent page scroll behavior.
-function isOnVisualizer(el) {
-  if (!el) return false;
-  return el.closest('.vizWrap') || el.closest('.viz3d') || el.tagName === 'CANVAS';
-}
-document.addEventListener("wheel", (e) => {
-  // If embedded in a parent page, forward vertical wheel directly to parent.
-  if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
-    try {
-      if (window.top && window.top !== window && typeof window.top.scrollBy === "function") {
-        e.preventDefault();
-        window.top.scrollBy({ top: e.deltaY, left: 0, behavior: "auto" });
-        return;
-      }
-    } catch (_) {
-      // Cross-origin parent access blocked; fall through without preventing default.
-    }
-  }
-  // Never preventDefault here; keep scrolling behavior natural.
-}, { passive: false });
+  // prevent page scroll inside embed while interacting
+  if (firstGestureDone) e.preventDefault();
+}, { passive:false });
 
 updatePlayButton();
-
-// Start preloading audio files immediately on page load
-// This allows files to start downloading as soon as possible, reducing load time when user clicks play.
-preloadAllGenres();
-
-// Profile badge: hide if image missing, fade in if loaded
-(function(){
-  const badge = document.getElementById("profileBadge");
-  const avatar = document.getElementById("profileAvatar");
-  if (!badge || !avatar) return;
-  
-  // Check if image loads successfully
-  const showBadge = () => {
-    badge.classList.add("visible");
-  };
-  
-  const hideBadge = () => {
-    badge.style.display = "none";
-  };
-  
-  // Check image load status
-  if (avatar.complete) {
-    if (avatar.naturalWidth > 0 && avatar.naturalHeight > 0) {
-      showBadge();
-    } else {
-      hideBadge();
-    }
-  } else {
-    avatar.addEventListener("load", showBadge, { once: true });
-    avatar.addEventListener("error", hideBadge, { once: true });
-    // Also check after a short delay in case onerror fires before this
-    setTimeout(() => {
-      if (avatar.naturalWidth === 0 && avatar.naturalHeight === 0 && badge.style.display !== "none") {
-        hideBadge();
-      }
-    }, 100);
-  }
-})();
 </script>
 </body>
 </html>
