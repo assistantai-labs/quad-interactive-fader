@@ -3942,6 +3942,7 @@ setTimeout(() => {
       // Update colors only (no geometry changes) - set to black when no audio
       const positions = geometry.attributes.position;
       const colors = geometry.attributes.color;
+      const idleLuma = 0.045;
       
       for (let z = 0; z < historyLength; z++) {
         for (let x = 0; x < freqBins; x++) {
@@ -3950,8 +3951,8 @@ setTimeout(() => {
           // Ensure vertex stays at Y=0 (flat) - no geometry movement before audio starts
           positions.setY(vertexIndex, 0);
           
-          // Set to black when no audio is playing
-          colors.setXYZ(vertexIndex, 0, 0, 0);
+          // Keep a very low-luma fallback so visualizer remains visible.
+          colors.setXYZ(vertexIndex, idleLuma, idleLuma, idleLuma + 0.004);
         }
       }
       colors.needsUpdate = true;
@@ -4067,9 +4068,10 @@ setTimeout(() => {
         // Update color (Step 3: pass rawMix and vocalBeat for split control) - reuse color object
         getSpectrogramColor(energy, rawMix, vocalBeat, color);
         
-        // If energy is zero (no audio), keep it black and skip all color processing
+        // If energy is zero, keep a very dim mesh color so visualizer is still visible.
         if (energy === 0) {
-          colors.setXYZ(vertexIndex, 0, 0, 0);
+          const idle = 0.03 + rawMix * 0.015;
+          colors.setXYZ(vertexIndex, idle, idle, idle + 0.003);
           continue; // Skip to next vertex
         }
         
