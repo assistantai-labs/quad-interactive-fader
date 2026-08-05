@@ -599,20 +599,21 @@
 
     .beatControl {
       position: absolute;
-      right: 12px;
+      left: calc(75% + (var(--btnW) / 4) + 24px);
       top: 50%;
-      transform: translateY(-50%);
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
+      transform: translate(-50%, -50%);
+      display: block;
+      height: 30px;
       min-width: 0;
       z-index: 3;
       white-space: nowrap;
     }
 
     .beatLabel {
-      position: static;
-      transform: none;
+      position: absolute;
+      top: calc(100% + 5px);
+      left: 50%;
+      transform: translateX(-50%);
       font-size: clamp(11px, 1.3vw, 13px);
       letter-spacing: 0.18em;
       text-transform: uppercase;
@@ -788,8 +789,9 @@
       }
 
       .beatControl {
-        right: 8px;
-        gap: 8px;
+        left: calc(75% + (var(--btnW) / 4) + 18px);
+        transform: translate(-50%, -50%);
+        height: 28px;
       }
 
       .beatLabel {
@@ -886,10 +888,10 @@
           <div class="controls">
             <button class="btn" id="btnPlay">PLAY</button>
             <div class="beatControl">
-              <span class="beatLabel">BEAT</span>
               <button class="beatToggle is-on" id="beatToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle beat">
                 <span class="beatToggleKnob"></span>
               </button>
+              <span class="beatLabel">BEAT</span>
             </div>
           </div>
         </div>
