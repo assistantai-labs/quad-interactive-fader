@@ -490,6 +490,14 @@
       font-size: var(--text);
     }
 
+    /* Defensive: if legacy fallback rows exist in stale embeds, hide them once enhanced UI is ready. */
+    .app.enhanced-ready [data-slider="blend"],
+    .app.enhanced-ready #wrapBlend,
+    .app.enhanced-ready #knobBlend,
+    .app.enhanced-ready #glowBlend {
+      display: none !important;
+    }
+
     .trackWrap {
       position: relative;
       height: var(--hitH);
@@ -3279,6 +3287,12 @@ setBeatState(true, false);
 setVolumeFromUI(masterVolume, false);
 setupGenreSelector();
 
+function markEnhancedReady() {
+  const appEl = document.querySelector(".app");
+  if (!appEl) return;
+  appEl.classList.add("enhanced-ready");
+}
+
 function setupGenreSelector() {
   const wrap = document.getElementById("genreWrap");
   const rail = document.getElementById("genreRail");
@@ -4205,6 +4219,9 @@ setTimeout(() => {
   // Initial render to test
   renderer.render(scene, camera);
   console.log('Initial render complete');
+
+  // Enhanced experience is fully initialized (genre UI + 3D renderer).
+  markEnhancedReady();
   
   // Start animation
   animate();
