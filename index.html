@@ -550,6 +550,7 @@
 
     .controls {
       display: block;
+      --sideCtlOffset: calc((var(--btnW) / 4) + 24px);
       padding-top: 6px;
       padding-bottom: 10px;
       margin-top: 0;
@@ -599,7 +600,7 @@
 
     .beatControl {
       position: absolute;
-      left: calc(75% + (var(--btnW) / 4) + 24px);
+      left: calc(75% + var(--sideCtlOffset));
       top: 50%;
       transform: translate(-50%, -50%);
       display: block;
@@ -607,93 +608,6 @@
       min-width: 0;
       z-index: 3;
       white-space: nowrap;
-    }
-
-    .volumeControl {
-      position: absolute;
-      left: calc(25% - (var(--btnW) / 4) - 24px);
-      top: 50%;
-      transform: translate(-50%, -50%);
-      display: block;
-      height: 30px;
-      min-width: 0;
-      z-index: 3;
-      white-space: nowrap;
-    }
-
-    .volumeLabel {
-      position: absolute;
-      top: calc(100% + 5px);
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: clamp(11px, 1.3vw, 13px);
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.92);
-      line-height: 1;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-
-    .volumePill {
-      width: 62px;
-      height: 30px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.9);
-      background: rgba(255,255,255,0.08);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 14px rgba(0,0,0,0.32);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 8px;
-      box-sizing: border-box;
-    }
-
-    .volumeSlider {
-      width: 100%;
-      height: 4px;
-      appearance: none;
-      -webkit-appearance: none;
-      background: rgba(255,255,255,0.28);
-      border-radius: 999px;
-      outline: none;
-      touch-action: pan-y;
-    }
-
-    .volumeSlider::-webkit-slider-runnable-track {
-      height: 4px;
-      background: rgba(255,255,255,0.28);
-      border-radius: 999px;
-    }
-
-    .volumeSlider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 14px;
-      height: 14px;
-      margin-top: -5px;
-      border-radius: 50%;
-      border: 0;
-      background: #fff;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.34);
-      cursor: pointer;
-    }
-
-    .volumeSlider::-moz-range-track {
-      height: 4px;
-      background: rgba(255,255,255,0.28);
-      border-radius: 999px;
-      border: 0;
-    }
-
-    .volumeSlider::-moz-range-thumb {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 0;
-      background: #fff;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.34);
-      cursor: pointer;
     }
 
     .beatLabel {
@@ -751,6 +665,80 @@
 
     .beatToggle.is-on .beatToggleKnob {
       left: calc(100% - 25px);
+    }
+
+    .volumeControl {
+      position: absolute;
+      left: calc(25% - var(--sideCtlOffset));
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: block;
+      height: 30px;
+      min-width: 0;
+      z-index: 3;
+      white-space: nowrap;
+    }
+
+    .volumeLabel {
+      position: absolute;
+      top: calc(100% + 5px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(11px, 1.3vw, 13px);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.92);
+      line-height: 1;
+      user-select: none;
+      -webkit-user-select: none;
+      pointer-events: none;
+    }
+
+    .volumeSlider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 62px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 8px 18px rgba(0,0,0,0.34);
+      padding: 0 4px;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .volumeSlider::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.25);
+    }
+
+    .volumeSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      margin-top: -8px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+    }
+
+    .volumeSlider::-moz-range-track {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.25);
+      border: 0;
+    }
+
+    .volumeSlider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 0;
+      background: #fff;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.35);
     }
 
     /* Loading indicator */
@@ -882,7 +870,7 @@
       }
 
       .volumeControl {
-        left: calc(25% - (var(--btnW) / 4) - 18px);
+        left: calc(25% - ((var(--btnW) / 4) + 18px));
         transform: translate(-50%, -50%);
         height: 28px;
       }
@@ -902,12 +890,6 @@
         height: 28px;
       }
 
-      .volumePill {
-        width: 58px;
-        height: 28px;
-        padding: 0 7px;
-      }
-
       .beatToggle .beatToggleKnob {
         width: 20px;
         height: 20px;
@@ -915,6 +897,22 @@
 
       .beatToggle.is-on .beatToggleKnob {
         left: calc(100% - 23px);
+      }
+
+      .volumeSlider {
+        width: 56px;
+        height: 28px;
+      }
+
+      .volumeSlider::-webkit-slider-thumb {
+        width: 18px;
+        height: 18px;
+        margin-top: -7px;
+      }
+
+      .volumeSlider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
       }
     }
     
@@ -990,13 +988,11 @@
       </div>
 
           <div class="controls">
-            <button class="btn" id="btnPlay">PLAY</button>
             <div class="volumeControl">
-              <div class="volumePill">
-                <input class="volumeSlider" id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume" />
-              </div>
+              <input class="volumeSlider" id="volumeSlider" type="range" min="0" max="100" step="1" value="85" aria-label="Volume control" />
               <span class="volumeLabel">VOL</span>
             </div>
+            <button class="btn" id="btnPlay">PLAY</button>
             <div class="beatControl">
               <button class="beatToggle is-on" id="beatToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle beat">
                 <span class="beatToggleKnob"></span>
@@ -1151,10 +1147,30 @@ let audio = {
   loading: false,
 };
 
+let masterVolume = 0.85;
+
+function configureIOSPlaybackSession() {
+  try {
+    if (navigator.audioSession && navigator.audioSession.type !== "playback") {
+      navigator.audioSession.type = "playback";
+    }
+  } catch (_) {}
+}
+
+function applyMasterVolume() {
+  if (!audio.ctx || !audio.masterGain) return;
+  const now = audio.ctx.currentTime || 0;
+  const clamped = Math.max(0, Math.min(1, masterVolume));
+  audio.masterGain.gain.cancelScheduledValues(now);
+  audio.masterGain.gain.setTargetAtTime(clamped, now, 0.02);
+}
+
 async function initAudio() {
   if (audio.ctx) return;
+  configureIOSPlaybackSession();
   const Ctx = window.AudioContext || window.webkitAudioContext;
   audio.ctx = new Ctx();
+  configureIOSPlaybackSession();
   // iOS: Don't resume here - must be called from user gesture handler
   // Resume will be called from gestureStartAudio() or play button
 }
@@ -1162,42 +1178,6 @@ async function initAudio() {
 let visualizerHasData = false;
 let userHasInteracted = false;
 let loadingIndicatorTimeoutId = null;
-let iosPlaybackUnlocked = false;
-let iosUnlockAudioEl = null;
-
-function createSilentWavDataUri() {
-  // Tiny silent PCM WAV payload for iOS playback category unlock.
-  return "data:audio/wav;base64,UklGRlQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-}
-
-async function ensureIOSPlaybackModeFromGesture() {
-  // Best path on newer Safari builds.
-  try {
-    if (navigator.audioSession && navigator.audioSession.type !== "playback") {
-      navigator.audioSession.type = "playback";
-      iosPlaybackUnlocked = true;
-    }
-  } catch (_) {}
-
-  if (iosPlaybackUnlocked) return;
-
-  // Fallback path: pulse a tiny inline audio element from a user gesture.
-  try {
-    if (!iosUnlockAudioEl) {
-      iosUnlockAudioEl = document.createElement("audio");
-      iosUnlockAudioEl.setAttribute("playsinline", "");
-      iosUnlockAudioEl.preload = "auto";
-      iosUnlockAudioEl.src = createSilentWavDataUri();
-      iosUnlockAudioEl.volume = 0.001;
-    }
-    await iosUnlockAudioEl.play();
-    iosUnlockAudioEl.pause();
-    iosUnlockAudioEl.currentTime = 0;
-    iosPlaybackUnlocked = true;
-  } catch (_) {
-    // Keep silent; we retry on next user gesture.
-  }
-}
 
 function showLoadingIndicator() {
   const indicator = document.getElementById('loadingIndicator');
@@ -1384,6 +1364,7 @@ function buildGraph() {
   
   // Create master gain and analyser to analyze final output
   audio.masterGain = audio.ctx.createGain();
+  audio.masterGain.gain.value = Math.max(0, Math.min(1, masterVolume));
   audio.analyser = audio.ctx.createAnalyser();
   audio.analyser.fftSize = 4096; // High resolution like Insight 2 (4096 FFT size)
   audio.analyser.smoothingTimeConstant = 0.1; // Less smoothing for more detail/granularity
@@ -1391,7 +1372,6 @@ function buildGraph() {
   audio.dataArray = new Uint8Array(bufferLength);
   
   // Connect analyser to master gain, then to destination
-  audio.masterGain.gain.value = volumeLevel;
   audio.masterGain.connect(audio.analyser);
   audio.analyser.connect(audio.ctx.destination);
   
@@ -1490,8 +1470,11 @@ async function ensureStarted() {
 }
 
 async function play() {
+  configureIOSPlaybackSession();
   await ensureStarted();
+  configureIOSPlaybackSession();
   await audio.ctx.resume();
+  applyMasterVolume();
   audio.playing = true;
   updatePlayButton();
 }
@@ -3024,18 +3007,10 @@ const btnPlay = document.getElementById("btnPlay");
 
 let tone = 0;
 let beatOn = true;
-let volumeLevel = 1;
 
 function applyMix(){
   if (!audio.ctx) return;
   setMix(tone, beatOn);
-}
-
-function applyMasterVolume() {
-  if (!audio.masterGain || !audio.ctx) return;
-  const now = audio.ctx.currentTime;
-  audio.masterGain.gain.cancelScheduledValues(now);
-  audio.masterGain.gain.setTargetAtTime(volumeLevel, now, 0.02);
 }
 
 let firstGestureDone = false;
@@ -3044,7 +3019,6 @@ async function onFirstInteract(){
   if (firstGestureDone) return;
   firstGestureDone = true;
   userHasInteracted = true;
-  await ensureIOSPlaybackModeFromGesture();
   visualizerHasData = false;
   if (!visualizerHasData) {
     showLoadingIndicator();
@@ -3064,7 +3038,6 @@ btnPlay.addEventListener("click", async (e) => {
   e.preventDefault();
   userHasInteracted = true;
   try{
-    await ensureIOSPlaybackModeFromGesture();
     // iOS: click is a safe gesture; force resume
     await initAudio();
     await audio.ctx.resume();
@@ -3102,7 +3075,6 @@ window.addEventListener("keydown", async (e) => {
   e.preventDefault();
   userHasInteracted = true;
   try{
-    await ensureIOSPlaybackModeFromGesture();
     await initAudio();
     await audio.ctx.resume();
     if (!audio.started) {
@@ -3246,7 +3218,7 @@ const sliderTone = makeSlider({
 });
 
 const beatToggleBtn = document.getElementById("beatToggle");
-const volumeSliderInput = document.getElementById("volumeSlider");
+const volumeSliderEl = document.getElementById("volumeSlider");
 
 function updateBeatToggleUI() {
   if (!beatToggleBtn) return;
@@ -3273,23 +3245,33 @@ if (beatToggleBtn) {
   }, { passive: true });
 }
 
-if (volumeSliderInput) {
-  const initialVolume = parseFloat(volumeSliderInput.value);
-  if (Number.isFinite(initialVolume)) {
-    volumeLevel = Math.max(0, Math.min(1, initialVolume));
+function setVolumeFromUI(v, fromUser = false) {
+  const next = Math.max(0, Math.min(1, Number(v)));
+  masterVolume = next;
+  if (volumeSliderEl) {
+    volumeSliderEl.value = String(Math.round(next * 100));
   }
-  volumeSliderInput.addEventListener("input", () => {
-    const next = parseFloat(volumeSliderInput.value);
-    if (!Number.isFinite(next)) return;
-    volumeLevel = Math.max(0, Math.min(1, next));
+  if (fromUser) {
     userHasInteracted = true;
     onFirstInteract();
-    applyMasterVolume();
+  }
+  applyMasterVolume();
+}
+
+if (volumeSliderEl) {
+  volumeSliderEl.addEventListener("input", (e) => {
+    const val = Number(e.target.value) / 100;
+    setVolumeFromUI(val, true);
+  }, { passive: true });
+  volumeSliderEl.addEventListener("change", (e) => {
+    const val = Number(e.target.value) / 100;
+    setVolumeFromUI(val, true);
   }, { passive: true });
 }
 
 tone = sliderTone.value;
 setBeatState(true, false);
+setVolumeFromUI(masterVolume, false);
 setupGenreSelector();
 
 function setupGenreSelector() {
@@ -3960,6 +3942,7 @@ setTimeout(() => {
       // Update colors only (no geometry changes) - set to black when no audio
       const positions = geometry.attributes.position;
       const colors = geometry.attributes.color;
+      const idleLuma = 0.045;
       
       for (let z = 0; z < historyLength; z++) {
         for (let x = 0; x < freqBins; x++) {
@@ -3968,8 +3951,8 @@ setTimeout(() => {
           // Ensure vertex stays at Y=0 (flat) - no geometry movement before audio starts
           positions.setY(vertexIndex, 0);
           
-          // Set to black when no audio is playing
-          colors.setXYZ(vertexIndex, 0, 0, 0);
+          // Keep a very low-luma fallback so visualizer remains visible.
+          colors.setXYZ(vertexIndex, idleLuma, idleLuma, idleLuma + 0.004);
         }
       }
       colors.needsUpdate = true;
@@ -4085,9 +4068,10 @@ setTimeout(() => {
         // Update color (Step 3: pass rawMix and vocalBeat for split control) - reuse color object
         getSpectrogramColor(energy, rawMix, vocalBeat, color);
         
-        // If energy is zero (no audio), keep it black and skip all color processing
+        // If energy is zero, keep a very dim mesh color so visualizer is still visible.
         if (energy === 0) {
-          colors.setXYZ(vertexIndex, 0, 0, 0);
+          const idle = 0.03 + rawMix * 0.015;
+          colors.setXYZ(vertexIndex, idle, idle, idle + 0.003);
           continue; // Skip to next vertex
         }
         
@@ -4229,6 +4213,7 @@ let isDraggingSlider = false;
 let touchStartY = 0;
 let touchStartX = 0;
 let touchStartTime = 0;
+let lastTouchClientY = 0;
 let isVerticalScrollIntent = false;
 let scrollOverlay = null;
 
@@ -4247,11 +4232,11 @@ function isInteractiveElement(target) {
   const trackWrap = target.closest('.trackWrap');
   if (trackWrap) return true;
 
+  // Volume controller
+  if (target.closest('.volumeControl') || target.id === 'volumeSlider') return true;
+
   // Genre selector rail/dots/title should remain interactive (no scroll overlay capture)
   if (target.closest('#genreWrap') || target.closest('#genreRail') || target.closest('.genreLabel')) return true;
-  
-  // Volume pill control
-  if (target.closest('.volumeControl') || target.id === 'volumeSlider') return true;
   
   // Check if it's a button
   if (target.closest('button') || target.tagName === 'BUTTON') return true;
@@ -4292,15 +4277,40 @@ document.addEventListener("touchstart", (e) => {
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
     touchStartTime = performance.now();
+    lastTouchClientY = e.touches[0].clientY;
   }
 }, { passive: true });
 
+function forwardTouchScrollToParent(e) {
+  if (!e.touches || e.touches.length !== 1) return false;
+  const currentY = e.touches[0].clientY;
+  if (!lastTouchClientY) {
+    lastTouchClientY = currentY;
+    return false;
+  }
+  const deltaY = currentY - lastTouchClientY;
+  lastTouchClientY = currentY;
+  if (Math.abs(deltaY) < 0.5) return false;
+  try {
+    if (window.top && window.top !== window && typeof window.top.scrollBy === "function") {
+      if (e.cancelable) e.preventDefault();
+      window.top.scrollBy({ top: -deltaY, left: 0, behavior: "auto" });
+      return true;
+    }
+  } catch (_) {
+    // Cross-origin parent access blocked; fallback to default browser behavior.
+  }
+  return false;
+}
+
 document.addEventListener("touchmove", (e) => {
   const target = e.target;
+  forwardTouchScrollToParent(e);
   
-  // If user is interacting with slider/button, never block vertical page scroll.
+  // If user is interacting with slider/button, allow scroll-through.
   if (isInteractiveElement(target)) {
     if (scrollOverlay) scrollOverlay.classList.remove('active');
+    
     return;
   }
   
@@ -4314,7 +4324,7 @@ document.addEventListener("touchmove", (e) => {
     return;
   }
   
-  // Never preventDefault here; parent page scroll should always win.
+  // Other non-interactive areas: never prevent default; keep parent-page vertical scroll natural.
 }, { passive: false });
 
 document.addEventListener("touchend", (e) => {
@@ -4324,6 +4334,7 @@ document.addEventListener("touchend", (e) => {
   touchStartY = 0;
   touchStartX = 0;
   touchStartTime = 0;
+  lastTouchClientY = 0;
   
   // Deactivate overlay after a short delay (allows final scroll momentum)
   if (scrollOverlay) {
