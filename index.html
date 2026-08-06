@@ -18,11 +18,13 @@
     }
 
     html, body {
-      height: 100%;
+      height: auto;
+      min-height: 100%;
       margin: 0;
       padding: 0;
       background: #000;
       overflow-x: hidden; /* kill sideways drag */
+      overflow-y: auto;
     }
 
     body {
@@ -33,7 +35,9 @@
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
       touch-action: pan-y pinch-zoom;
-      overflow: hidden; /* the app itself should not scroll on desktop */
+      min-height: 100vh;
+      overflow-x: hidden;
+      overflow-y: auto;
     }
     
     /* Wrapper to clamp horizontal overflow and prevent horizontal scroll */
@@ -791,9 +795,10 @@
 
     @media (max-width: 767px){
       html, body {
-        height: 100% !important;
+        height: auto !important;
+        min-height: 100% !important;
         overflow-x: hidden !important;
-        overflow-y: hidden !important;
+        overflow-y: auto !important;
       }
       
       .app {
